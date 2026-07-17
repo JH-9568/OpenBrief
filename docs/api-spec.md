@@ -1,0 +1,210 @@
+# TeamPulse API Spec
+
+Base URL: `/api/v1`
+
+The MVP API is designed for a future dashboard and for provider ingestion. Authentication is not production-ready yet; approval endpoints temporarily use `X-TeamPulse-Member-ID`.
+
+## Workspaces and Projects
+
+### Create workspace
+
+`POST /workspaces`
+
+```json
+{
+  "name": "Design Team",
+  "timezone": "Asia/Seoul"
+}
+```
+
+### Create project
+
+`POST /projects`
+
+```json
+{
+  "workspace_id": "uuid",
+  "name": "Mobile App Redesign",
+  "description": "Q3 product redesign",
+  "daily_report_channel_id": "discord-channel-id"
+}
+```
+
+### Get project
+
+`GET /projects/{project_id}`
+
+## Members
+
+### Create member
+
+`POST /projects/{project_id}/members`
+
+```json
+{
+  "display_name": "Jin",
+  "email": "jin@example.com",
+  "role": "designer"
+}
+```
+
+### List members
+
+`GET /projects/{project_id}/members`
+
+Active members are snapshotted when a brief revision is created.
+
+## Integrations
+
+### Create integration
+
+`POST /projects/{project_id}/integrations`
+
+```json
+{
+  "provider": "figma",
+  "external_id": "figma-file-or-webhook-id",
+  "name": "Main design file",
+  "credentials": {
+    "access_token": "secret"
+  },
+  "config": {
+    "file_key": "abc123"
+  }
+}
+```
+
+If `credentials` is present, `TOKEN_ENCRYPTION_KEY` must be configured.
+
+### List integrations
+
+`GET /projects/{project_id}/integrations`
+
+## Source Items
+
+### Manual/dev ingest
+
+`POST /source-items/ingest`
+
+```json
+{
+  "project_id": "uuid",
+  "provider": "discord",
+  "external_id": "discord:message-id",
+  "kind": "meeting_message",
+  "title": "Discord meeting note",
+  "body": "Decision: use variant B.",
+  "source_url": "https://discord.com/channels/...",
+  "occurred_at": "2026-07-18T10:00:00+09:00",
+  "actor": { "username": "jin" },
+  "metadata": { "channel_id": "123" },
+  "raw_payload": {}
+}
+```
+
+Duplicate detection uses `(provider, external_id)`.
+
+## Webhooks
+
+### Figma
+
+`POST /webhooks/figma/{project_id}?integration_id={integration_id}`
+
+Expected provider behavior:
+
+- Figma sends JSON webhook events such as `PING`, `FILE_UPDATE`, and `FILE_COMMENT`.
+- The payload includes `passcode`.
+- TeamPulse compares it to `FIGMA_WEBHOOK_PASSCODE`.
+
+Stored source kinds:
+
+- `FILE_COMMENT` -> `design_comment`
+- other file events -> `design_update`
+
+### Notion
+
+`POST /webhooks/notion/{project_id}?integration_id={integration_id}`
+
+Expected provider behavior:
+
+- Initial verification requests contain `verification_token`; TeamPulse accepts them without creating source items.
+- Event requests include `X-Notion-Signature`.
+- TeamPulse validates HMAC-SHA256 using `NOTION_WEBHOOK_VERIFICATION_TOKEN`.
+
+Stored source kinds:
+
+- page/block events -> `planning_doc`
+- database/data source events -> `task_change`
+
+## Briefs
+
+### Generate daily brief
+
+`POST /projects/{project_id}/briefs/generate`
+
+```json
+{
+  "since": "2026-07-18T00:00:00+09:00",
+  "until": "2026-07-18T23:59:59+09:00"
+}
+```
+
+Creates a new pending revision, snapshots active members, and supersedes previous pending revisions.
+
+### List briefs
+
+`GET /projects/{project_id}/briefs`
+
+### Edit brief
+
+`POST /projects/{project_id}/briefs/{revision_id}/edit`
+
+```json
+{
+  "created_by": "jin@example.com",
+  "content": {
+    "sections": [
+      {
+        "key": "decisions",
+        "title": "Decisions",
+        "claims": [
+          {
+            "text": "Use variant B for onboarding.",
+            "status": "confirmed",
+            "source_item_ids": ["uuid"]
+          }
+        ]
+      }
+    ],
+    "source_window": {},
+    "diff_from_last_confirmed": []
+  }
+}
+```
+
+Editing creates a new revision and invalidates previous approvals by changing revision identity/hash.
+
+### Approve brief
+
+`POST /projects/{project_id}/briefs/{revision_id}/approve`
+
+Header:
+
+`X-TeamPulse-Member-ID: {project_member_id}`
+
+The revision becomes `confirmed` only when all snapshotted active members have approved the same revision hash.
+
+### Get approval state
+
+`GET /projects/{project_id}/briefs/{revision_id}/approval-state`
+
+```json
+{
+  "revision_id": "uuid",
+  "revision_hash": "sha256",
+  "required_count": 3,
+  "approved_count": 2,
+  "pending_member_ids": ["uuid"],
+  "status": "pending_approval"
+}
+```

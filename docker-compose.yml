@@ -1,0 +1,75 @@
+name: teampulse
+
+services:
+  api:
+    build: .
+    command: uvicorn teampulse.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - .env.example
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: celery -A teampulse.worker.celery_app worker --loglevel=INFO
+    env_file:
+      - .env.example
+      - path: .env
+        required: false
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build: .
+    command: celery -A teampulse.worker.celery_app beat --loglevel=INFO
+    env_file:
+      - .env.example
+      - path: .env
+        required: false
+    volumes:
+      - .:/app
+    depends_on:
+      - worker
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: teampulse
+      POSTGRES_USER: teampulse
+      POSTGRES_PASSWORD: teampulse
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U teampulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:

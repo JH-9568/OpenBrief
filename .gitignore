@@ -1,0 +1,9 @@
+.env
+.omx/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+*.db
+.DS_Store

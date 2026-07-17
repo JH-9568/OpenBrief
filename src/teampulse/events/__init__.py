@@ -1,0 +1,2 @@
+"""Normalized event ingestion module."""
+
