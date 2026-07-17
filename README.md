@@ -18,6 +18,7 @@ Implemented in this repository:
 - Alembic initial migration.
 - Figma and Notion webhook ingestion boundaries.
 - Figma REST sync for file metadata and comments.
+- Notion REST sync for page metadata and block text.
 - Discord integration polling that stores opted-in channel messages as source items.
 - Source item normalization and idempotent storage.
 - Daily brief revision generation with a deterministic summarizer fallback.

@@ -109,6 +109,22 @@ Figma integration example:
 }
 ```
 
+Notion integration example:
+
+```json
+{
+  "provider": "notion",
+  "external_id": "notion-page-id",
+  "name": "Sprint plan",
+  "credentials": {
+    "access_token": "notion-token"
+  },
+  "config": {
+    "page_ids": ["notion-page-id"]
+  }
+}
+```
+
 ### List integrations
 
 `GET /projects/{project_id}/integrations`
@@ -121,6 +137,7 @@ Implemented providers:
 
 - Discord: fetches channel messages after `config.last_message_id`, stores them as source items, then updates `config.last_message_id`.
 - Figma: fetches file metadata and comments, stores them as source items, then updates `config.last_synced_at`.
+- Notion: fetches page metadata and block children, stores text as source items, then updates `config.last_synced_at`.
 
 ```json
 {

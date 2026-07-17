@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     notion_webhook_verification_token: SecretStr = Field(
         default=SecretStr("development-only-notion")
     )
+    notion_access_token: SecretStr | None = None
     discord_bot_token: SecretStr | None = None
     token_encryption_key: SecretStr | None = None
     daily_brief_hour: int = 18

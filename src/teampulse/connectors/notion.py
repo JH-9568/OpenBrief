@@ -2,6 +2,9 @@ import hmac
 import json
 from datetime import UTC, datetime
 from hashlib import sha256
+from typing import Any
+
+import httpx
 
 from teampulse.connectors.base import NormalizedSourceItem
 from teampulse.models import Provider, SourceItemKind
@@ -62,3 +65,40 @@ def parse_dt(value: str | None) -> datetime:
     if not value:
         return datetime.now(UTC)
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+class NotionClient:
+    base_url = "https://api.notion.com/v1"
+    notion_version = "2022-06-28"
+
+    async def retrieve_page(self, *, access_token: str, page_id: str) -> dict[str, Any]:
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=20) as client:
+            response = await client.get(
+                f"/pages/{page_id}",
+                headers=self._headers(access_token),
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def retrieve_block_children(
+        self,
+        *,
+        access_token: str,
+        block_id: str,
+        page_size: int = 100,
+    ) -> list[dict[str, Any]]:
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=20) as client:
+            response = await client.get(
+                f"/blocks/{block_id}/children",
+                params={"page_size": page_size},
+                headers=self._headers(access_token),
+            )
+            response.raise_for_status()
+            payload = response.json()
+            return list(payload.get("results", []))
+
+    def _headers(self, access_token: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {access_token}",
+            "Notion-Version": self.notion_version,
+        }
