@@ -17,7 +17,7 @@ Implemented in this repository:
 - PostgreSQL/SQLAlchemy 2.x models.
 - Alembic initial migration.
 - Figma and Notion webhook ingestion boundaries.
-- Discord REST client boundary for channel polling and message sending.
+- Discord integration polling that stores opted-in channel messages as source items.
 - Source item normalization and idempotent storage.
 - Daily brief revision generation with a deterministic summarizer fallback.
 - Revision approval state with unanimous approval.
@@ -28,7 +28,7 @@ Not implemented yet:
 
 - Production authentication and organization management.
 - Real LLM provider integration.
-- Full Discord scheduler that polls configured channels.
+- Automatic recurring Discord scheduler configuration.
 - Web dashboard UI.
 - Slack/GitHub integrations and source write-back.
 

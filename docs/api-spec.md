@@ -76,9 +76,45 @@ Active members are snapshotted when a brief revision is created.
 
 If `credentials` is present, `TOKEN_ENCRYPTION_KEY` must be configured.
 
+Discord integration example:
+
+```json
+{
+  "provider": "discord",
+  "external_id": "discord-channel-id",
+  "name": "Project Discord channel",
+  "credentials": {
+    "bot_token": "discord-bot-token"
+  },
+  "config": {
+    "channel_id": "discord-channel-id",
+    "poll_limit": 50
+  }
+}
+```
+
 ### List integrations
 
 `GET /projects/{project_id}/integrations`
+
+### Poll Discord integration
+
+`POST /projects/{project_id}/integrations/{integration_id}/poll`
+
+Currently implemented for Discord only. It fetches channel messages after
+`config.last_message_id`, stores them as source items, then updates
+`config.last_message_id`.
+
+```json
+{
+  "integration_id": "uuid",
+  "channel_id": "discord-channel-id",
+  "fetched": 12,
+  "stored": 10,
+  "duplicates": 2,
+  "last_message_id": "discord-snowflake"
+}
+```
 
 ## Source Items
 

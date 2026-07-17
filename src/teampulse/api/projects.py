@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from teampulse.config import Settings, get_settings
 from teampulse.db import get_session
-from teampulse.models import Integration, Project, ProjectMember, Workspace
+from teampulse.integrations.discord import poll_discord_integration
+from teampulse.models import Integration, Project, ProjectMember, Provider, Workspace
 from teampulse.schemas import (
     IntegrationCreate,
+    IntegrationPollRead,
     IntegrationRead,
     ProjectCreate,
     ProjectMemberCreate,
@@ -129,3 +131,25 @@ async def list_integrations(
 ) -> list[Integration]:
     result = await session.execute(select(Integration).where(Integration.project_id == project_id))
     return list(result.scalars().all())
+
+
+@router.post(
+    "/projects/{project_id}/integrations/{integration_id}/poll",
+    response_model=IntegrationPollRead,
+)
+async def poll_integration(
+    project_id: uuid.UUID,
+    integration_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> IntegrationPollRead:
+    integration = await session.get(Integration, integration_id)
+    if integration is None or integration.project_id != project_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Integration not found")
+    if integration.provider != Provider.DISCORD:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Only Discord polling is implemented")
+    try:
+        result = await poll_discord_integration(session, integration_id, settings)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    return IntegrationPollRead.model_validate(result)

@@ -84,6 +84,15 @@ class IntegrationRead(BaseModel):
     created_at: datetime
 
 
+class IntegrationPollRead(BaseModel):
+    integration_id: uuid.UUID
+    channel_id: str
+    fetched: int
+    stored: int
+    duplicates: int
+    last_message_id: str | None
+
+
 class SourceItemCreate(BaseModel):
     project_id: uuid.UUID
     integration_id: uuid.UUID | None = None

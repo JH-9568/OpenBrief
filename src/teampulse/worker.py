@@ -1,5 +1,4 @@
 import asyncio
-import json
 import uuid
 
 from celery import Celery
@@ -7,8 +6,7 @@ from celery import Celery
 from teampulse.briefs.service import build_daily_revision
 from teampulse.config import get_settings
 from teampulse.db import SessionFactory
-from teampulse.models import Integration, Provider
-from teampulse.security import CredentialCipher
+from teampulse.integrations.discord import poll_discord_integration
 from teampulse.sources.service import list_source_items
 
 settings = get_settings()
@@ -34,26 +32,12 @@ async def _generate_daily_brief(project_id: uuid.UUID) -> str:
         return str(revision.id)
 
 
-def decrypt_integration_credentials(integration: Integration) -> dict:
-    if not integration.encrypted_credentials:
-        return {}
-    if settings.token_encryption_key is None:
-        raise RuntimeError("TOKEN_ENCRYPTION_KEY is required to decrypt integration credentials")
-    cipher = CredentialCipher(settings.token_encryption_key.get_secret_value())
-    return json.loads(cipher.decrypt(integration.encrypted_credentials))
-
-
 @celery_app.task(name="teampulse.poll_discord_channel")
 def poll_discord_channel(integration_id: str) -> int:
-    # The real polling orchestration is intentionally thin here; provider permissions and
-    # channel consent must be configured before this task is scheduled.
-    return asyncio.run(_validate_discord_integration(uuid.UUID(integration_id)))
+    return asyncio.run(_poll_discord_channel(uuid.UUID(integration_id)))
 
 
-async def _validate_discord_integration(integration_id: uuid.UUID) -> int:
+async def _poll_discord_channel(integration_id: uuid.UUID) -> int:
     async with SessionFactory() as session:
-        integration = await session.get(Integration, integration_id)
-        if integration is None or integration.provider != Provider.DISCORD:
-            return 0
-        decrypt_integration_credentials(integration)
-        return 0
+        result = await poll_discord_integration(session, integration_id, settings)
+        return result.stored
