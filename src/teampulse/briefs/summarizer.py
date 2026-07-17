@@ -43,18 +43,25 @@ class StructuredBriefBuilder:
         )
 
     def _section_key(self, item: SourceItem) -> str:
-        if item.kind in {SourceItemKind.DESIGN_UPDATE, SourceItemKind.DESIGN_COMMENT}:
+        lowered = f"{item.title}\n{item.body}".lower()
+        if any(token in lowered for token in ["conflict", "contradict", "충돌"]):
+            return "conflicts"
+        if any(token in lowered for token in ["decision", "decided", "결정"]):
+            return "decisions"
+        if any(token in lowered for token in ["blocker", "blocked", "지연", "막힘", "overdue"]):
+            return "schedule_risks"
+        if any(token in lowered for token in ["todo", "할 일", "해야", "/status"]):
+            return "tasks"
+        if any(token in lowered for token in ["done", "completed", "완료", "끝남"]):
+            return "completed"
+        if item.kind == SourceItemKind.DESIGN_UPDATE:
+            return "design_changes"
+        if item.kind == SourceItemKind.DESIGN_COMMENT:
             return "design_changes"
         if item.kind == SourceItemKind.PLANNING_DOC:
             return "planning"
         if item.kind == SourceItemKind.TASK_CHANGE:
             return "tasks"
-        if item.kind == SourceItemKind.MEETING_MESSAGE:
-            lowered = f"{item.title}\n{item.body}".lower()
-            if any(token in lowered for token in ["decision", "decided", "결정"]):
-                return "decisions"
-            if any(token in lowered for token in ["blocker", "blocked", "지연", "막힘"]):
-                return "schedule_risks"
         return "conflicts"
 
     def _claim_text(self, item: SourceItem) -> str:
