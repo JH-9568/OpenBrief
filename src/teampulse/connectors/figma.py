@@ -27,10 +27,17 @@ class FigmaWebhookConnector:
         del headers
         payload = json.loads(body)
         event_type = payload.get("event_type", "UNKNOWN")
+        if event_type == "PING":
+            return []
         occurred_at = parse_dt(payload.get("timestamp") or payload.get("created_at"))
         file_key = payload.get("file_key") or "unknown-file"
         webhook_id = payload.get("webhook_id", "unknown-webhook")
-        event_id = payload.get("comment_id") or payload.get("timestamp")
+        event_id = (
+            payload.get("comment_id")
+            or payload.get("version_id")
+            or payload.get("timestamp")
+            or "unknown-event"
+        )
         external_id = f"figma:{webhook_id}:{event_type}:{file_key}:{event_id}"
         kind = (
             SourceItemKind.DESIGN_COMMENT

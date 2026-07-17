@@ -151,6 +151,7 @@ Expected provider behavior:
 - Figma sends JSON webhook events such as `PING`, `FILE_UPDATE`, and `FILE_COMMENT`.
 - The payload includes `passcode`.
 - TeamPulse compares it to `FIGMA_WEBHOOK_PASSCODE`.
+- `PING` verifies connectivity only and does not create a source item.
 
 Stored source kinds:
 
