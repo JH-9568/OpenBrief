@@ -118,6 +118,19 @@ Currently implemented for Discord only. It fetches channel messages after
 
 ## Source Items
 
+### List project source items
+
+`GET /projects/{project_id}/source-items`
+
+Query parameters:
+
+- `since`: optional ISO datetime lower bound.
+- `until`: optional ISO datetime upper bound.
+- `provider`: optional provider filter, for example `discord`, `figma`, `notion`.
+- `kind`: optional source kind filter, for example `meeting_message`, `design_comment`.
+
+This endpoint is the evidence feed for a project brief.
+
 ### Manual/dev ingest
 
 `POST /source-items/ingest`

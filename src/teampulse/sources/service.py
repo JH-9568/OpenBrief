@@ -6,7 +6,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from teampulse.models import SourceItem
+from teampulse.models import Provider, SourceItem, SourceItemKind
 from teampulse.schemas import SourceItemCreate
 
 
@@ -48,11 +48,17 @@ async def list_source_items(
     project_id: uuid.UUID,
     since: datetime | None = None,
     until: datetime | None = None,
+    provider: Provider | None = None,
+    kind: SourceItemKind | None = None,
 ) -> Sequence[SourceItem]:
     query: Select[tuple[SourceItem]] = select(SourceItem).where(SourceItem.project_id == project_id)
     if since:
         query = query.where(SourceItem.occurred_at >= since)
     if until:
         query = query.where(SourceItem.occurred_at <= until)
+    if provider:
+        query = query.where(SourceItem.provider == provider)
+    if kind:
+        query = query.where(SourceItem.kind == kind)
     result = await session.execute(query.order_by(SourceItem.occurred_at.asc()))
     return result.scalars().all()
