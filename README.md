@@ -14,6 +14,7 @@ The product direction is intentionally read-only for source systems:
 Implemented in this repository:
 
 - FastAPI application structure.
+- Local app CLI: `teampulse init/start/stop/status`.
 - PostgreSQL/SQLAlchemy 2.x models.
 - Alembic initial migration.
 - Figma and Notion webhook ingestion boundaries.
@@ -34,8 +35,51 @@ Not implemented yet:
 - Production authentication and organization management.
 - Real LLM provider integration.
 - Production-grade schedule locking for multi-instance deployments.
-- Web dashboard UI.
+- Production web dashboard UI with a separate frontend.
 - Slack/GitHub integrations and source write-back.
+
+## Local App Mode
+
+TeamPulse can run like a small app installed on your Mac. Internally it starts
+a local FastAPI web server and stores data in `~/.teampulse/teampulse.db` by
+default.
+
+For local development from this repository:
+
+```bash
+python -m pip install -e ".[dev]"
+teampulse init
+teampulse start
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000/dashboard
+```
+
+To run it in the background:
+
+```bash
+teampulse start --daemon
+teampulse status
+teampulse stop
+```
+
+Local app files are stored under:
+
+```text
+~/.teampulse/
+  config.toml
+  teampulse.db
+  teampulse.pid
+  logs/
+```
+
+Local app mode is best for personal or small-team usage. Because external
+services cannot send webhooks to your Mac's `localhost` directly, local mode
+should prefer API polling or a temporary tunnel during development. Cloud
+deployment is still the right path for production webhooks and team-wide access.
 
 ## Local Setup
 
