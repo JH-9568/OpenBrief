@@ -40,6 +40,7 @@ async def create_revision(
     content: BriefContent,
     source_items: Sequence[SourceItem],
     created_by: str = "system",
+    source_item_ids: Sequence[str] | None = None,
 ) -> BriefRevision:
     await supersede_pending_revisions(session, project_id)
     version_result = await session.execute(
@@ -58,7 +59,9 @@ async def create_revision(
         status=BriefRevisionStatus.PENDING_APPROVAL,
         content=content_dict,
         approver_snapshot=snapshot,
-        source_item_ids=[str(item.id) for item in source_items],
+        source_item_ids=list(source_item_ids)
+        if source_item_ids is not None
+        else [str(item.id) for item in source_items],
         created_by=created_by,
     )
     session.add(revision)

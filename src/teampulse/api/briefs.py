@@ -78,7 +78,14 @@ async def edit_brief(
     existing = await session.get(BriefRevision, revision_id)
     if existing is None or existing.project_id != project_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brief revision not found")
-    revision = await create_revision(session, project_id, payload.content, [], payload.created_by)
+    revision = await create_revision(
+        session,
+        project_id,
+        payload.content,
+        [],
+        payload.created_by,
+        source_item_ids=existing.source_item_ids,
+    )
     return revision
 
 
