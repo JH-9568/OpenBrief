@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 
 from teampulse.api.briefs import router as briefs_router
+from teampulse.api.dashboard import router as dashboard_router
 from teampulse.api.health import router as health_router
 from teampulse.api.projects import router as projects_router
 from teampulse.api.source_items import router as source_items_router
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     application.include_router(source_items_router, dependencies=protected)
     application.include_router(briefs_router, dependencies=protected)
     application.include_router(webhook_router, dependencies=protected)
+    application.include_router(dashboard_router, dependencies=protected)
     return application
 
 

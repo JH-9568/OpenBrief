@@ -52,6 +52,7 @@ curl http://localhost:8000/health
 ```
 
 API docs are available at `http://localhost:8000/docs`.
+Project dashboards are available at `/dashboard/projects/{project_id}`.
 
 If `API_KEY` is set, protected API routes require:
 
