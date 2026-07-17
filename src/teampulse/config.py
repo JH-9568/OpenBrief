@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     figma_webhook_passcode: SecretStr = Field(default=SecretStr("development-only-figma"))
     figma_access_token: SecretStr | None = None
+    discord_application_id: str | None = None
     notion_webhook_verification_token: SecretStr = Field(
         default=SecretStr("development-only-notion")
     )

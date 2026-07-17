@@ -6,6 +6,17 @@ The MVP API is designed for a future dashboard and for provider ingestion. Authe
 
 ## Workspaces and Projects
 
+## Integration Setup
+
+### Get provider setup guide
+
+`GET /integration-setup/{provider}`
+
+Supported MVP providers: `discord`, `figma`, `notion`.
+
+Returns required permissions, config fields, provider docs, and for Discord an
+install URL when `DISCORD_APPLICATION_ID` is configured.
+
 ### Create workspace
 
 `POST /workspaces`
