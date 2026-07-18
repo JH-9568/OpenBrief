@@ -494,102 +494,93 @@ def render_project_dashboard(
     if state is not None:
         approval_text = f"{state.approved_count}/{state.required_count} approvals"
     brief_status = html.escape(brief.status.value.replace("_", " ")) if brief else "not generated"
+    revision_text = f"v{brief.version}" if brief else "-"
+    project_description = html.escape(
+        project.description
+        or "Figma, Notion, Discord, GitHub 내용을 로컬에서 모아 정리합니다."
+    )
     body = f"""
     <nav class="topbar">
       <a class="brand" href="/dashboard">
-        <span class="brand-mark">TP</span>
+        <span class="brand-mark">OB</span>
         <span>OpenBrief</span>
       </a>
       <div class="topbar-actions">
-        <a class="ghost-button" href="/docs">API Docs</a>
         <a class="ghost-button" href="/dashboard">Projects</a>
+        <a class="ghost-button" href="/docs">API</a>
       </div>
     </nav>
 
-    <section class="project-hero">
-      <div>
-        <p class="eyebrow">Project cockpit</p>
+    <section class="project-shell">
+      <div class="project-title">
+        <p class="eyebrow">Local project brief</p>
         <h1>{html.escape(project.name)}</h1>
-        <p class="hero-copy">{html.escape(project.description or "")}</p>
-        <div class="provider-row">{provider_pills}</div>
-        <div class="hero-actions">
-          <form method="post" action="/dashboard/projects/{project.id}/sync">
-            <button type="submit">Sync now</button>
-          </form>
-          <form method="post" action="/dashboard/projects/{project.id}/brief">
-            <button class="secondary-button" type="submit">Generate brief</button>
-          </form>
-        </div>
+        <p class="hero-copy">{project_description}</p>
       </div>
-      <aside class="status-card">
-        <p class="eyebrow">Current status</p>
+      <div class="hero-actions">
+        <form method="post" action="/dashboard/projects/{project.id}/sync">
+          <button type="submit">Sync now</button>
+        </form>
+        <form method="post" action="/dashboard/projects/{project.id}/brief">
+          <button class="secondary-button" type="submit">Generate brief</button>
+        </form>
+      </div>
+      <div class="provider-row">{provider_pills}</div>
+    </section>
+
+    <section class="summary-strip" aria-label="project summary">
+      <article>
+        <span>Brief</span><strong>{revision_text}</strong><small>{brief_status}</small>
+      </article>
+      <article>
+        <span>Evidence</span><strong>{len(source_items)}</strong><small>collected locally</small>
+      </article>
+      <article>
+        <span>Connections</span><strong>{len(integrations)}</strong><small>active sources</small>
+      </article>
+      <article>
+        <span>Review</span>
         <strong>{html.escape(approval_text)}</strong>
-        <span>{len(source_items)} source evidence items</span>
-      </aside>
-    </section>
-
-    <section class="metric-grid">
-      <article class="metric-card">
-        <span>Brief revision</span>
-        <strong>{f"v{brief.version}" if brief else "-"}</strong>
-        <small>{brief_status}</small>
+        <small>{len(members)} reviewers</small>
       </article>
-      <article class="metric-card">
-        <span>Reviewers</span>
-        <strong>{len(members)}</strong>
-        <small>local confirmation profile</small>
-      </article>
-      <article class="metric-card">
-        <span>Evidence</span>
-        <strong>{len(source_items)}</strong>
-        <small>latest collected items</small>
-      </article>
-    </section>
-
-    {next_actions}
-
-    <section class="content-section" id="connections">
-      <div class="section-heading">
-        <p class="eyebrow">Connections</p>
-        <h2>연결 상태와 진단</h2>
-      </div>
-      <div class="connection-grid">{connection_cards}</div>
-    </section>
-
-    <section class="content-section" id="setup">
-      <div class="section-heading">
-        <p class="eyebrow">Setup</p>
-        <h2>웹에서 연결 추가</h2>
-      </div>
-      {setup_panel}
     </section>
 
     <section class="dashboard-layout">
       <div class="main-column">
         <div class="section-heading">
           <p class="eyebrow">AI Brief</p>
-          <h2>Latest Brief · 검토할 프로젝트 정리</h2>
+          <h2>Latest Brief</h2>
         </div>
         {brief_html}
       </div>
       <aside class="side-column">
-        <div class="section-heading">
-          <p class="eyebrow" id="sources">Source Evidence</p>
-          <h2>수집된 원본 근거</h2>
-        </div>
-        <div class="source-list">{sources_html}</div>
+        {next_actions}
+        <details class="collapsible-card" id="connections" open>
+          <summary>연결 상태 <span>{len(integrations)}</span></summary>
+          <div class="connection-grid compact-grid">{connection_cards}</div>
+        </details>
+        <details class="collapsible-card" id="setup">
+          <summary>연결 추가</summary>
+          {setup_panel}
+        </details>
       </aside>
     </section>
 
-    <section class="content-section" id="settings">
-      <div class="section-heading">
-        <p class="eyebrow">Settings</p>
-        <h2>AI·알림·데이터 관리</h2>
-      </div>
+    <details class="collapsible-card wide-card" id="sources">
+      <summary>원본 근거 보기 <span>{len(source_items)}개</span></summary>
+      <p class="muted source-note">
+        AI 브리프가 믿기 어려울 때만 펼쳐서 원문을 확인하세요.
+        원본 서비스는 수정하지 않습니다.
+      </p>
+      <div class="source-list">{sources_html}</div>
+    </details>
+
+    <details class="collapsible-card wide-card" id="settings">
+      <summary>AI·알림·데이터 설정</summary>
       {reminder_panel}
       {render_ai_settings_panel(project.id)}
       {render_danger_zone(project.id)}
-    </section>
+    </details>
     """
     return html_page(f"OpenBrief - {project.name}", body)
 
@@ -611,11 +602,11 @@ def render_next_actions(
     items = "\n".join(
         f"<a class='action-card' href='{href}'>"
         f"<span>{step}</span><strong>{html.escape(label)}</strong>"
-        "<small>다음 단계로 이동</small></a>"
+        "<small>바로 이동</small></a>"
         for step, label, href in actions[:4]
     )
     return f"""
-    <section class="content-section">
+    <section class="next-action-panel">
       <div class="section-heading">
         <p class="eyebrow">Next actions</p>
         <h2>지금 해야 할 일</h2>
@@ -790,19 +781,19 @@ def html_page(title: str, body: str) -> str:
   <style>
     :root {{
       color-scheme: light;
-      --bg: #f4f7fb;
+      --bg: #f6f7fb;
       --surface: #ffffff;
       --surface-strong: #f8fafc;
       --text: #0f172a;
       --muted: #64748b;
       --line: #dbe3ef;
-      --primary: #4f46e5;
-      --primary-dark: #3730a3;
-      --primary-soft: #eef2ff;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-soft: #eff6ff;
       --success: #059669;
       --warning: #d97706;
-      --shadow: 0 24px 80px rgba(15, 23, 42, 0.10);
-      --radius: 24px;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.07);
+      --radius: 20px;
     }}
     * {{
       box-sizing: border-box;
@@ -815,8 +806,8 @@ def html_page(title: str, body: str) -> str:
         "Segoe UI", sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(79, 70, 229, 0.18), transparent 34rem),
-        linear-gradient(180deg, #f8fbff 0%, var(--bg) 42%, #eef4fb 100%);
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.10), transparent 30rem),
+        linear-gradient(180deg, #fbfdff 0%, var(--bg) 44%, #f1f5f9 100%);
       line-height: 1.55;
       word-break: keep-all;
       overflow-wrap: normal;
@@ -826,9 +817,9 @@ def html_page(title: str, body: str) -> str:
       text-decoration: none;
     }}
     main {{
-      width: min(1280px, calc(100vw - 56px));
+      width: min(1180px, calc(100vw - 48px));
       margin: 0 auto;
-      padding: 28px 0 56px;
+      padding: 22px 0 46px;
     }}
     .topbar {{
       display: flex;
@@ -869,17 +860,24 @@ def html_page(title: str, body: str) -> str:
       font-size: 14px;
       font-weight: 700;
     }}
-    .hero, .project-hero {{
+    .hero, .project-hero, .project-shell {{
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 320px;
-      gap: 24px;
-      align-items: stretch;
-      padding: 34px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+      padding: 28px;
       border: 1px solid rgba(148, 163, 184, 0.24);
-      border-radius: 32px;
-      background: rgba(255, 255, 255, 0.78);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.86);
       box-shadow: var(--shadow);
       backdrop-filter: blur(18px);
+    }}
+    .project-shell .provider-row {{
+      grid-column: 1 / -1;
+      margin-top: 2px;
+    }}
+    .project-title {{
+      min-width: 0;
     }}
     .hero {{
       margin-top: 18px;
@@ -891,12 +889,19 @@ def html_page(title: str, body: str) -> str:
       line-height: 0.98;
       letter-spacing: -0.075em;
     }}
+    .project-shell h1 {{
+      max-width: 760px;
+      margin: 6px 0 10px;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1;
+      letter-spacing: -0.065em;
+    }}
     .hero-copy {{
       max-width: 720px;
       margin: 0;
       color: var(--muted);
-      font-size: 17px;
-      line-height: 1.75;
+      font-size: 16px;
+      line-height: 1.65;
     }}
     .hero-panel, .status-card {{
       display: flex;
@@ -931,15 +936,15 @@ def html_page(title: str, body: str) -> str:
       letter-spacing: 0.14em;
       text-transform: uppercase;
     }}
-    .content-section, .dashboard-layout, .metric-grid {{
-      margin-top: 26px;
+    .content-section, .dashboard-layout, .metric-grid, .summary-strip, .wide-card {{
+      margin-top: 18px;
     }}
     .section-heading {{
       margin-bottom: 14px;
     }}
     .section-heading h2 {{
       margin: 4px 0 0;
-      font-size: 24px;
+      font-size: 22px;
       letter-spacing: -0.04em;
     }}
     .project-grid {{
@@ -977,9 +982,6 @@ def html_page(title: str, body: str) -> str:
       color: var(--primary);
       font-weight: 900;
     }}
-    .provider-row {{
-      margin-top: 22px;
-    }}
     .provider-pill {{
       display: inline-flex;
       align-items: center;
@@ -988,7 +990,7 @@ def html_page(title: str, body: str) -> str:
       border: 1px solid rgba(100, 116, 139, 0.16);
       border-radius: 999px;
       color: #334155;
-      background: rgba(255, 255, 255, 0.72);
+      background: rgba(248, 250, 252, 0.92);
       font-size: 13px;
       font-weight: 800;
       text-transform: capitalize;
@@ -1014,6 +1016,37 @@ def html_page(title: str, body: str) -> str:
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 16px;
     }}
+    .summary-strip {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }}
+    .summary-strip article {{
+      min-width: 0;
+      padding: 16px 18px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+    }}
+    .summary-strip span, .summary-strip small {{
+      display: block;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .summary-strip strong {{
+      display: block;
+      overflow: hidden;
+      margin: 5px 0 3px;
+      font-size: 22px;
+      letter-spacing: -0.05em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
     .metric-card, .approval-card, .brief-card, .source-card,
     .connection-card, .settings-card, .setup-panel, .action-card {{
       border: 1px solid rgba(148, 163, 184, 0.24);
@@ -1037,8 +1070,8 @@ def html_page(title: str, body: str) -> str:
     }}
     .dashboard-layout {{
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 380px;
-      gap: 22px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 18px;
       align-items: start;
     }}
     .main-column, .side-column {{
@@ -1050,7 +1083,7 @@ def html_page(title: str, body: str) -> str:
       justify-content: space-between;
       gap: 16px;
       margin-bottom: 14px;
-      padding: 16px 18px;
+      padding: 14px 16px;
       border: 1px solid rgba(148, 163, 184, 0.24);
       border-radius: var(--radius);
       background: rgba(255, 255, 255, 0.82);
@@ -1104,14 +1137,15 @@ def html_page(title: str, body: str) -> str:
     }}
     .hero-actions {{
       display: flex;
+      justify-content: flex-end;
       gap: 10px;
       flex-wrap: wrap;
-      margin-top: 22px;
+      margin-top: 0;
     }}
     button, select, input {{
-      min-height: 42px;
+      min-height: 40px;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 11px;
       font: inherit;
     }}
     select, input {{
@@ -1141,19 +1175,42 @@ def html_page(title: str, body: str) -> str:
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 14px;
     }}
+    .next-action-panel {{
+      padding: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 14px 40px rgba(15, 23, 42, 0.05);
+    }}
+    .next-action-panel .section-heading {{
+      margin-bottom: 12px;
+    }}
+    .next-action-panel .section-heading h2 {{
+      font-size: 18px;
+    }}
+    .next-action-panel .action-grid {{
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }}
     .connection-grid {{
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }}
+    .compact-grid {{
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }}
     .action-card {{
-      display: block;
-      padding: 18px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 13px;
     }}
     .action-card span {{
       display: grid;
       place-items: center;
+      flex: 0 0 auto;
       width: 32px;
       height: 32px;
-      margin-bottom: 12px;
       border-radius: 50%;
       color: white;
       background: var(--primary);
@@ -1161,14 +1218,13 @@ def html_page(title: str, body: str) -> str:
     }}
     .action-card strong {{
       display: block;
-      margin-bottom: 6px;
       letter-spacing: -0.03em;
     }}
     .action-card small {{
       color: var(--muted);
     }}
     .connection-card, .settings-card {{
-      padding: 20px;
+      padding: 16px;
     }}
     .connection-head {{
       display: flex;
@@ -1182,10 +1238,10 @@ def html_page(title: str, body: str) -> str:
     }}
     .setup-panel {{
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
+      grid-template-columns: 1fr;
+      gap: 12px;
       align-items: end;
-      padding: 20px;
+      padding: 16px;
     }}
     .setup-panel label {{
       display: grid;
@@ -1209,7 +1265,7 @@ def html_page(title: str, body: str) -> str:
       gap: 14px;
     }}
     .brief-card {{
-      padding: 22px;
+      padding: 20px;
     }}
     .brief-card ul {{
       display: grid;
@@ -1223,8 +1279,8 @@ def html_page(title: str, body: str) -> str:
       align-items: flex-start;
       gap: 10px;
       margin: 0;
-      padding: 12px 14px;
-      border-radius: 16px;
+      padding: 11px 13px;
+      border-radius: 14px;
       background: var(--surface-strong);
     }}
     .claim::before {{
@@ -1259,8 +1315,12 @@ def html_page(title: str, body: str) -> str:
       display: grid;
       gap: 12px;
     }}
+    .wide-card .source-list {{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 14px;
+    }}
     .source-card {{
-      padding: 16px;
+      padding: 14px;
     }}
     .source-card h3 {{
       margin-top: 10px;
@@ -1270,6 +1330,47 @@ def html_page(title: str, body: str) -> str:
       margin: 10px 0 0;
       color: #475569;
       font-size: 14px;
+    }}
+    .source-note {{
+      margin: 12px 0 0;
+    }}
+    .collapsible-card {{
+      margin-top: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 14px 40px rgba(15, 23, 42, 0.05);
+    }}
+    .collapsible-card summary {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 17px 18px;
+      cursor: pointer;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      list-style: none;
+    }}
+    .collapsible-card summary::-webkit-details-marker {{
+      display: none;
+    }}
+    .collapsible-card summary::after {{
+      content: "펼치기";
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }}
+    .collapsible-card[open] summary::after {{
+      content: "접기";
+    }}
+    .collapsible-card summary span {{
+      color: var(--primary);
+      font-size: 13px;
+    }}
+    .collapsible-card > :not(summary) {{
+      margin: 0 18px 18px;
     }}
     .source-meta {{
       display: flex;
@@ -1307,10 +1408,10 @@ def html_page(title: str, body: str) -> str:
     @media (max-width: 1100px) {{
       body {{ min-width: 0; }}
       main {{ width: min(100% - 28px, 960px); }}
-      .hero, .project-hero, .dashboard-layout {{
+      .hero, .project-hero, .project-shell, .dashboard-layout {{
         grid-template-columns: 1fr;
       }}
-      .metric-grid, .project-grid {{
+      .metric-grid, .project-grid, .summary-strip, .wide-card .source-list {{
         grid-template-columns: 1fr;
       }}
       .action-grid, .connection-grid, .setup-panel {{
@@ -1468,6 +1569,7 @@ def render_source_item(item: SourceItem) -> str:
     source_url = html.escape(item.source_url or "")
     link = f"<a class='source-link' href='{source_url}'>{source_url}</a>" if source_url else ""
     occurred_at = item.occurred_at.strftime("%Y-%m-%d %H:%M")
+    preview = item.body[:260] + ("..." if len(item.body) > 260 else "")
     return (
         f"<article class='source-card' id='source-{item.id}'>"
         "<div class='source-meta'>"
@@ -1475,7 +1577,7 @@ def render_source_item(item: SourceItem) -> str:
         f"<code>{html.escape(item.kind.value.replace('_', ' '))}</code>"
         "</div>"
         f"<h3>{html.escape(item.title)}</h3>"
-        f"<p>{html.escape(item.body[:500])}</p>"
+        f"<p>{html.escape(preview)}</p>"
         f"<p class='muted'>{html.escape(occurred_at)} · {link}</p>"
         "</article>"
     )
