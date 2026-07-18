@@ -233,11 +233,27 @@ openbrief brief
   logs/
 ```
 
-provider token은 `openbrief setup` 또는 `openbrief auth` 시 로컬 SQLite DB에 암호화되어 저장됩니다. OpenAI API key는 `~/.openbrief/config.toml`에 저장됩니다.
+provider token은 `openbrief setup` 또는 `openbrief auth` 시 로컬 SQLite DB에 암호화되어 저장됩니다.
 
-암호화 키는 현재 `~/.openbrief/config.toml`에 저장됩니다. 따라서 `~/.openbrief` 디렉터리는 일반 앱 데이터처럼 보호해야 합니다.
+OpenAI API key와 provider token 암호화 키는 가능한 경우 OS credential store에 저장됩니다.
 
-향후 macOS Keychain 연동으로 개선할 예정입니다.
+- macOS: Keychain
+- Windows: Credential Manager
+- Linux: Secret Service/keyring backend
+
+사용 중인 환경에 credential store가 없으면 `~/.openbrief/.secrets.json`으로 fallback합니다. 이 fallback 파일은 권한 `600`으로 생성되지만 OS Keychain 수준의 보호는 아닙니다. 회사/팀 실사용에서는 OS credential store가 동작하는 환경을 권장합니다.
+
+보안상 권장되는 입력 방식:
+
+```bash
+openbrief auth openai
+openbrief auth figma
+openbrief auth notion
+openbrief auth discord
+openbrief auth github
+```
+
+`--token`, `--openai-api-key`, `--github-token` 같은 인자 입력은 shell history에 남을 수 있으므로 테스트 외에는 권장하지 않습니다.
 
 ## 왜 Webhook이 아니라 Polling인가?
 
@@ -400,8 +416,8 @@ pytest
 1. 웹 대시보드에 `Sync now` / `Generate brief` 버튼 추가
 2. 웹 대시보드에 개인 프로젝트/연동 설정 화면 추가
 3. 실제 Figma/Notion/Discord/GitHub token으로 end-to-end sync 검증
-4. OpenAI API key 입력 UX 개선
+4. 웹 설정 화면에서 안전한 token 입력 UX 추가
 5. Discord `/status`, `/blockers`, `/meeting-end` 명령 처리
 6. Slack 연동
-7. macOS Keychain 토큰 저장
+7. credential store 상태 점검/진단 명령 추가
 8. Cloud/Webhook 버전 설계

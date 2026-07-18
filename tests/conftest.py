@@ -6,6 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from openbrief.models import Base
 
 
+@pytest.fixture(autouse=True)
+def local_secret_file_backend(monkeypatch):
+    monkeypatch.setenv("OPENBRIEF_SECRET_BACKEND", "file")
+
+
 @pytest.fixture
 async def session() -> AsyncIterator[AsyncSession]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")

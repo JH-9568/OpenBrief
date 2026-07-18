@@ -24,8 +24,12 @@ def test_init_creates_local_config_and_sqlite_database(tmp_path, monkeypatch, ca
 
     assert exit_code == 0
     assert (tmp_path / "config.toml").exists()
+    assert (tmp_path / ".secrets.json").exists()
     assert (tmp_path / "openbrief.db").exists()
     assert "OpenBrief local app initialized" in capsys.readouterr().out
+    config_text = (tmp_path / "config.toml").read_text(encoding="utf-8")
+    assert "[secrets]" not in config_text
+    assert "token_encryption_key" not in config_text
 
 
 def test_status_reports_not_running_for_fresh_local_home(tmp_path, monkeypatch, capsys):
@@ -153,6 +157,9 @@ def test_setup_stores_openai_settings(tmp_path, monkeypatch):
     assert config.ai_summarizer_url == "https://api.openai.com/v1/chat/completions"
     assert config.ai_summarizer_api_key == "sk-test"
     assert config.ai_summarizer_model == "gpt-test"
+    config_text = (tmp_path / "config.toml").read_text(encoding="utf-8")
+    assert "sk-test" not in config_text
+    assert "ai_summarizer_api_key" not in config_text
 
 
 def test_auth_stores_openai_settings_from_prompt(tmp_path, monkeypatch):
@@ -165,6 +172,46 @@ def test_auth_stores_openai_settings_from_prompt(tmp_path, monkeypatch):
     config = cli.load_or_default_config(tmp_path)
     assert config.ai_summarizer_api_key == "sk-prompt"
     assert config.ai_summarizer_model == "gpt-prompt"
+    assert "sk-prompt" not in (tmp_path / "config.toml").read_text(encoding="utf-8")
+
+
+def test_legacy_config_secrets_are_migrated_out_of_config(tmp_path, monkeypatch):
+    monkeypatch.setenv(cli.HOME_ENV, str(tmp_path))
+    legacy_key = cli.Fernet.generate_key().decode()
+    (tmp_path / "config.toml").write_text(
+        f"""# OpenBrief local app config
+
+[server]
+host = "127.0.0.1"
+port = 8000
+
+[database]
+url = "{cli.sqlite_url(tmp_path / "openbrief.db")}"
+
+[app]
+open_browser = true
+log_path = "{tmp_path / "logs" / "openbrief.log"}"
+pid_path = "{tmp_path / "openbrief.pid"}"
+run_path = "{tmp_path / "run.json"}"
+
+[ai]
+summarizer_url = "https://api.openai.com/v1/chat/completions"
+model = "gpt-test"
+
+[secrets]
+token_encryption_key = "{legacy_key}"
+ai_summarizer_api_key = "sk-legacy"
+""",
+        encoding="utf-8",
+    )
+
+    config = cli.ensure_initialized(home_arg=tmp_path, force=False)
+
+    assert config.token_encryption_key == legacy_key
+    assert config.ai_summarizer_api_key == "sk-legacy"
+    config_text = (tmp_path / "config.toml").read_text(encoding="utf-8")
+    assert "[secrets]" not in config_text
+    assert "sk-legacy" not in config_text
 
 
 def test_auth_updates_existing_provider_integration(tmp_path, monkeypatch, capsys):

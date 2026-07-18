@@ -15,7 +15,8 @@ Source systems remain authoritative. OpenBrief does not modify Figma, Notion, Di
 - AI claims must carry source references and a status: confirmed, AI inference, conflict, or needs confirmation.
 - Revision confirmation can snapshot active members for future team workflows. The local open-source mode creates a default owner automatically.
 - Editing a brief creates a new revision hash and supersedes the previous pending draft.
-- Credentials are encrypted before database storage; production key custody must use a KMS or secret manager.
+- Provider credentials are encrypted before database storage.
+- Local secret custody uses the OS credential store when available, with a restricted file fallback only when no keyring backend exists.
 
 ## Runtime Components
 
@@ -84,7 +85,13 @@ The current code ships with `StructuredBriefBuilder`, a deterministic fallback t
 ## Security and Privacy
 
 - Source collection is opt-in per local project.
-- External credentials are encrypted at rest via Fernet for local MVP.
-- Production must move encryption key custody out of app environment variables.
+- External provider credentials are encrypted at rest via Fernet for the local MVP.
+- The Fernet key and OpenAI-compatible API key are stored in the OS credential store when available:
+  - macOS Keychain
+  - Windows Credential Manager
+  - Linux Secret Service/keyring backend
+- If no OS credential store is available, OpenBrief falls back to `~/.openbrief/.secrets.json` with file mode `600`. This is an execution fallback, not the recommended security posture for team or company use.
+- `~/.openbrief/config.toml` must not contain provider tokens, the Fernet key, or AI API keys.
+- Users should prefer `openbrief auth ...` prompt input over token command-line flags because shell history can retain command arguments.
 - Discord collection needs channel/member consent and retention policy before pilot use.
 - The MVP uses a temporary member-id header for confirmation; cloud/team deployments need real auth.

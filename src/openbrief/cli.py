@@ -27,6 +27,12 @@ from openbrief.integrations.discord import poll_discord_integration
 from openbrief.integrations.figma import sync_figma_integration
 from openbrief.integrations.github import sync_github_integration
 from openbrief.integrations.notion import sync_notion_integration
+from openbrief.local_secrets import (
+    get_or_create_secret,
+    get_secret,
+    migrate_legacy_secret,
+    set_secret,
+)
 from openbrief.models import (
     Base,
     Integration,
@@ -41,6 +47,8 @@ from openbrief.security import CredentialCipher
 HOME_ENV = "OPENBRIEF_HOME"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
+TOKEN_ENCRYPTION_SECRET = "token_encryption_key"
+AI_SUMMARIZER_SECRET = "ai_summarizer_api_key"
 
 
 @dataclass(frozen=True)
@@ -271,7 +279,10 @@ def auth_command(args: argparse.Namespace) -> int:
             url=args.ai_url,
             model=args.ai_model,
         )
-        print(f"Stored OpenAI-compatible API key for model {config.ai_summarizer_model}.")
+        print(
+            "Stored OpenAI-compatible API key in the OS credential store "
+            f"for model {config.ai_summarizer_model}."
+        )
         return 0
 
     updated = asyncio.run(
@@ -731,6 +742,10 @@ def load_or_default_config(home_arg: Path | None) -> LocalConfig:
     app = data.get("app", {})
     secrets = data.get("secrets", {})
     ai = data.get("ai", {})
+    legacy_token_encryption_key = optional_string(secrets.get(TOKEN_ENCRYPTION_SECRET))
+    legacy_ai_summarizer_api_key = optional_string(secrets.get(AI_SUMMARIZER_SECRET))
+    migrate_legacy_secret(home, TOKEN_ENCRYPTION_SECRET, legacy_token_encryption_key)
+    migrate_legacy_secret(home, AI_SUMMARIZER_SECRET, legacy_ai_summarizer_api_key)
     return LocalConfig(
         home=home,
         config_path=config_path,
@@ -741,13 +756,13 @@ def load_or_default_config(home_arg: Path | None) -> LocalConfig:
         log_path=Path(app.get("log_path", default.log_path)).expanduser(),
         pid_path=Path(app.get("pid_path", default.pid_path)).expanduser(),
         run_path=Path(app.get("run_path", default.run_path)).expanduser(),
-        token_encryption_key=str(
-            secrets.get("token_encryption_key", default.token_encryption_key)
+        token_encryption_key=get_or_create_secret(
+            home,
+            TOKEN_ENCRYPTION_SECRET,
+            lambda: legacy_token_encryption_key or Fernet.generate_key().decode(),
         ),
         ai_summarizer_url=optional_string(ai.get("summarizer_url", default.ai_summarizer_url)),
-        ai_summarizer_api_key=optional_string(
-            secrets.get("ai_summarizer_api_key", default.ai_summarizer_api_key)
-        ),
+        ai_summarizer_api_key=get_secret(home, AI_SUMMARIZER_SECRET),
         ai_summarizer_model=str(ai.get("model", default.ai_summarizer_model)),
     )
 
@@ -764,9 +779,13 @@ def default_config(home: Path) -> LocalConfig:
         log_path=home / "logs" / "openbrief.log",
         pid_path=home / "openbrief.pid",
         run_path=home / "run.json",
-        token_encryption_key=Fernet.generate_key().decode(),
+        token_encryption_key=get_or_create_secret(
+            home,
+            TOKEN_ENCRYPTION_SECRET,
+            lambda: Fernet.generate_key().decode(),
+        ),
         ai_summarizer_url=None,
-        ai_summarizer_api_key=None,
+        ai_summarizer_api_key=get_secret(home, AI_SUMMARIZER_SECRET),
         ai_summarizer_model="gpt-4.1-mini",
     )
 
@@ -815,10 +834,6 @@ run_path = "{config.run_path}"
 [ai]
 summarizer_url = {toml_string_or_none(config.ai_summarizer_url)}
 model = "{config.ai_summarizer_model}"
-
-[secrets]
-token_encryption_key = "{config.token_encryption_key}"
-ai_summarizer_api_key = {toml_string_or_none(config.ai_summarizer_api_key)}
 """,
         encoding="utf-8",
     )
@@ -831,6 +846,7 @@ def save_ai_settings(
     url: str,
     model: str,
 ) -> LocalConfig:
+    set_secret(config.home, AI_SUMMARIZER_SECRET, api_key)
     updated = LocalConfig(
         home=config.home,
         config_path=config.config_path,
@@ -843,7 +859,7 @@ def save_ai_settings(
         run_path=config.run_path,
         token_encryption_key=config.token_encryption_key,
         ai_summarizer_url=url,
-        ai_summarizer_api_key=api_key,
+        ai_summarizer_api_key=get_secret(config.home, AI_SUMMARIZER_SECRET),
         ai_summarizer_model=model,
     )
     write_config(updated)
@@ -867,7 +883,7 @@ def config_needs_migration(path: Path) -> bool:
     if not path.exists():
         return False
     data = tomllib.loads(path.read_text(encoding="utf-8"))
-    return "token_encryption_key" not in data.get("secrets", {}) or "ai" not in data
+    return bool(data.get("secrets")) or "ai" not in data
 
 
 def apply_runtime_env(config: LocalConfig) -> None:

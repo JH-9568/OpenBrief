@@ -6,4 +6,5 @@ __pycache__/
 .ruff_cache/
 *.py[cod]
 *.db
+.secrets.json
 .DS_Store
