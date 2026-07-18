@@ -1,71 +1,95 @@
 # TeamPulse
 
-TeamPulse collects project context from Figma, Notion, and Discord, then produces a cited daily project brief that the whole team can review and approve.
+TeamPulse는 Figma, Notion, Discord, GitHub 등에 흩어진 프로젝트 맥락을 한곳에 모아 정리하는 로컬 협업 자동화 앱입니다.
 
-The product direction is intentionally read-only for source systems:
+디자인 시안, 회의 내용, 기획 문서, 할 일, 완료된 일, 일정 변경, PR/Issue/Commit 같은 정보를 수집하고, 팀이 함께 확인할 수 있는 프로젝트 브리프를 만듭니다.
 
-- TeamPulse reads explicitly connected Figma files, Notion pages/databases, and Discord channels.
-- TeamPulse creates internal draft brief revisions and sends one Discord reminder.
-- TeamPulse never edits Figma, Notion, Discord, GitHub, or Slack in the MVP.
-- A brief becomes confirmed only when every snapshotted active project member approves the same revision hash.
+현재 방향은 명확합니다.
 
-## MVP Scope
+- 원본 서비스에는 기본적으로 반영하지 않습니다.
+- TeamPulse는 먼저 읽고, 정리하고, 근거를 남깁니다.
+- AI가 만든 정리본은 초안입니다.
+- 팀원이 모두 승인해야 확정본이 됩니다.
+- 로컬 앱 MVP에서는 Webhook보다 API polling을 우선 사용합니다.
 
-Implemented in this repository:
+## 현재 구현 상태
 
-- FastAPI application structure.
-- Local app CLI: `teampulse init/start/stop/status`.
-- PostgreSQL/SQLAlchemy 2.x models.
-- Alembic initial migration.
-- Figma and Notion webhook ingestion boundaries.
-- Figma REST sync for file metadata and comments.
-- Notion REST sync for page metadata and block text.
-- Discord integration polling that stores opted-in channel messages as source items.
-- Source item normalization and idempotent storage.
-- Daily brief revision generation with a deterministic summarizer fallback.
-- Optional OpenAI-compatible AI summarizer endpoint.
-- Discord daily brief reminder delivery with duplicate protection.
-- Celery Beat daily scheduler for polling, brief generation, and reminder delivery.
-- Revision approval state with unanimous approval.
-- Docker Compose for API, worker, PostgreSQL, and Redis.
-- pytest coverage for idempotent ingestion and unanimous approval.
+구현된 기능:
 
-Not implemented yet:
+- Python 3.12 / FastAPI 기반 API 서버
+- macOS 로컬 앱처럼 쓰는 CLI
+  - `teampulse init`
+  - `teampulse setup`
+  - `teampulse sync`
+  - `teampulse start`
+  - `teampulse start --daemon`
+  - `teampulse status`
+  - `teampulse stop`
+- 로컬 SQLite DB 기본 실행
+- PostgreSQL / SQLAlchemy 2.x 모델
+- Alembic 마이그레이션
+- Figma REST API sync
+  - 파일 메타데이터
+  - 댓글
+- Notion REST API sync
+  - 페이지 메타데이터
+  - 블록 텍스트
+- Discord Bot API polling
+  - 지정 채널 메시지 수집
+  - 명령어 메시지 구분
+- GitHub REST API sync
+  - Issues
+  - Pull Requests
+  - Commits
+  - GitHub Actions workflow runs
+- SourceItem 정규화 및 중복 저장 방지
+- 일일 브리프 생성
+  - deterministic fallback summarizer
+  - OpenAI 호환 AI summarizer endpoint 옵션
+- 브리프 승인 상태
+  - 활성 팀원 전원 승인 방식
+- Discord 일일 브리프 알림 전송
+- Celery worker / scheduler 구조
+- Docker Compose 개발 환경
+- pytest 테스트
 
-- Production authentication and organization management.
-- Real LLM provider integration.
-- Production-grade schedule locking for multi-instance deployments.
-- Production web dashboard UI with a separate frontend.
-- Slack/GitHub integrations and source write-back.
+아직 미완성인 부분:
 
-## Local App Mode
+- 클릭 기반 웹 설정 화면
+- 실제 OpenAI client 직접 연동
+- Slack 연동
+- 원본 서비스에 write-back 하는 양방향 동기화
+- 사용자/조직/로그인/권한 관리
+- production-grade 배포/모니터링
+- macOS `.app` 또는 `.dmg` 패키징
 
-TeamPulse can run like a small app installed on your Mac. Internally it starts
-a local FastAPI web server and stores data in `~/.teampulse/teampulse.db` by
-default.
+## 설치해서 쓰기
 
-For local development from this repository:
-
-```bash
-python -m pip install -e ".[dev]"
-teampulse init
-teampulse start
-```
-
-For a user-style install directly from GitHub:
+일반 사용자 설치 방식은 `pipx`를 권장합니다.
 
 ```bash
 pipx install "git+https://github.com/JH-9568/TeamPulse.git"
+```
+
+설치 후 초기화합니다.
+
+```bash
 teampulse init
 ```
 
-Then open:
+로컬 웹앱을 실행합니다.
+
+```bash
+teampulse start
+```
+
+브라우저에서 접속합니다.
 
 ```text
 http://127.0.0.1:8000/dashboard
 ```
 
-To run it in the background:
+백그라운드로 실행하려면:
 
 ```bash
 teampulse start --daemon
@@ -73,7 +97,45 @@ teampulse status
 teampulse stop
 ```
 
-To connect real project sources:
+## 개발 환경에서 실행하기
+
+레포를 클론한 상태에서는 editable install로 실행할 수 있습니다.
+
+```bash
+python -m pip install -e ".[dev]"
+teampulse init
+teampulse start
+```
+
+또는 Docker Compose로 실행합니다.
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+다른 터미널에서:
+
+```bash
+docker compose exec api alembic upgrade head
+curl http://localhost:8000/health
+```
+
+API 문서:
+
+```text
+http://localhost:8000/docs
+```
+
+프로젝트 대시보드:
+
+```text
+http://localhost:8000/dashboard
+```
+
+## 실제 프로젝트 연결하기
+
+`teampulse setup`으로 프로젝트와 외부 소스를 등록합니다.
 
 ```bash
 teampulse setup \
@@ -89,84 +151,188 @@ teampulse setup \
   --github-token "github_pat_..."
 ```
 
-Then poll connected sources:
+등록 후 데이터를 수집합니다.
 
 ```bash
 teampulse sync
+```
+
+특정 provider만 수집할 수도 있습니다.
+
+```bash
 teampulse sync --provider figma
 teampulse sync --provider notion
 teampulse sync --provider discord
 teampulse sync --provider github
 ```
 
-Provider tokens passed to `teampulse setup` are encrypted before they are stored
-in the local SQLite database. The local encryption key lives in
-`~/.teampulse/config.toml`, so protect this directory like other local app data.
+수집된 데이터는 SourceItem으로 정규화되어 로컬 DB에 저장됩니다.
 
-Local app files are stored under:
+## 로컬 앱 데이터 위치
+
+기본 경로:
 
 ```text
 ~/.teampulse/
   config.toml
   teampulse.db
   teampulse.pid
+  run.json
   logs/
 ```
 
-Local app mode is best for personal or small-team usage. Because external
-services cannot send webhooks to your Mac's `localhost` directly, local mode
-should prefer API polling or a temporary tunnel during development. Cloud
-deployment is still the right path for production webhooks and team-wide access.
+provider token은 `teampulse setup` 시 로컬 SQLite DB에 암호화되어 저장됩니다.
 
-## Local Setup
+암호화 키는 현재 `~/.teampulse/config.toml`에 저장됩니다. 따라서 `~/.teampulse` 디렉터리는 일반 앱 데이터처럼 보호해야 합니다.
 
-```bash
-cp .env.example .env
-docker compose up --build
+향후 macOS Keychain 연동으로 개선할 예정입니다.
+
+## 왜 Webhook이 아니라 Polling인가?
+
+로컬 앱은 사용자의 맥북에서 실행됩니다.
+
+Figma, Notion, GitHub, Discord 같은 외부 서비스는 사용자의 `localhost`로 Webhook을 직접 보낼 수 없습니다.
+
+그래서 로컬 앱 MVP에서는 다음 방식이 현실적입니다.
+
+```text
+TeamPulse가 각 서비스 공식 API를 주기적으로 조회
+↓
+변경분을 로컬 DB에 저장
+↓
+AI가 정리
+↓
+대시보드에서 확인
 ```
 
-In another shell:
+Cloud 버전에서는 Webhook/Event API를 사용하는 구조로 확장할 수 있습니다.
 
-```bash
-docker compose exec api alembic upgrade head
-curl http://localhost:8000/health
+## MCP를 쓰나요?
+
+제품 기능으로는 MCP를 사용하지 않습니다.
+
+TeamPulse가 실제 사용자 데이터를 가져오는 방식은 각 서비스의 공식 API입니다.
+
+- Figma REST API
+- Notion API
+- Discord Bot API
+- GitHub REST API
+- Slack Web API / Events API 예정
+
+MCP는 개발 과정에서 Codex가 브라우저나 외부 도구를 제어할 때 사용할 수 있는 개발 보조 수단입니다. TeamPulse 사용자가 제품을 쓰기 위해 MCP를 설치해야 하는 구조로 만들지 않습니다.
+
+## 외부 서비스 권한
+
+### Figma
+
+필요한 값:
+
+- Figma personal access token
+- Figma file URL 또는 file key
+
+수집 대상:
+
+- 파일 메타데이터
+- 파일 댓글
+
+### Notion
+
+필요한 값:
+
+- Notion integration token
+- Notion page URL 또는 page id
+
+수집 대상:
+
+- 페이지 메타데이터
+- 페이지 블록 텍스트
+
+주의:
+
+- Notion integration이 해당 페이지에 초대되어 있어야 합니다.
+
+### Discord
+
+필요한 값:
+
+- Discord bot token
+- Discord channel id
+
+필요 권한:
+
+- `VIEW_CHANNEL`
+- `READ_MESSAGE_HISTORY`
+- `SEND_MESSAGES`
+
+주의:
+
+- 메시지 내용 접근은 Discord의 Message Content 정책 영향을 받을 수 있습니다.
+
+### GitHub
+
+필요한 값:
+
+- `owner/repo` 형식의 repository
+- GitHub token
+
+Public repo는 token 없이도 일부 조회가 가능하지만 rate limit이 낮습니다.
+
+수집 대상:
+
+- Issues
+- Pull Requests
+- Commits
+- GitHub Actions workflow runs
+
+## AI 요약
+
+`AI_SUMMARIZER_URL`이 설정되어 있으면 OpenAI 호환 `chat/completions` endpoint를 호출합니다.
+
+설정하지 않거나 호출에 실패하면 deterministic fallback summarizer를 사용합니다.
+
+중요 정책:
+
+```text
+AI는 원본 도구를 수정하지 않습니다.
+AI는 정리 초안을 만듭니다.
+팀원이 확인하고 승인해야 확정됩니다.
 ```
 
-API docs are available at `http://localhost:8000/docs`.
-Project dashboards are available at `/dashboard` and `/dashboard/projects/{project_id}`.
-
-If `API_KEY` is set, protected API routes require:
-
-```bash
-X-TeamPulse-API-Key: your-api-key
-```
-
-If `AI_SUMMARIZER_URL` is set, TeamPulse calls that OpenAI-compatible
-chat/completions endpoint for brief generation. If it is empty or the call
-fails, TeamPulse uses the deterministic fallback summarizer.
-
-To create a local demo workspace/project/source-items/brief:
-
-```bash
-docker compose exec api python scripts/demo_seed.py
-```
-
-## Tests
+## 테스트
 
 ```bash
 python -m pip install -e ".[dev]"
+python -m ruff check src tests scripts
 pytest
-ruff check .
 ```
 
-## Key External Requirements
+현재 테스트는 다음 범위를 포함합니다.
 
-- Figma: needs `file_content:read`, `file_comments:read`, and `webhooks:write` if TeamPulse creates webhooks. Figma webhook events include a `passcode` that must match the configured secret.
-- Notion: needs read content and read comments capabilities for the connected pages/databases. Notion webhook requests should be verified with `X-Notion-Signature` using the subscription verification token.
-- Discord: needs a bot installed in opted-in channels with `VIEW_CHANNEL`, `READ_MESSAGE_HISTORY`, and `SEND_MESSAGES` for reminders. Message content availability depends on Discord's privileged Message Content policy.
+- API key auth
+- SourceItem 중복 저장 방지
+- Figma sync
+- Notion sync
+- Discord polling
+- GitHub sync
+- 브리프 생성/승인
+- 대시보드 렌더링
+- CLI init/setup/sync/status
 
-## Documents
+## 문서
 
 - [Architecture](docs/architecture.md)
 - [API Spec](docs/api-spec.md)
 - [ERD](docs/erd.md)
+
+## 추천 개발 순서
+
+다음으로 할 일:
+
+1. 웹 대시보드에 `Sync now` 버튼 추가
+2. 웹 대시보드에 프로젝트/연동 설정 화면 추가
+3. 실제 Figma/Notion/Discord/GitHub token으로 end-to-end sync 검증
+4. sync 후 자동 brief 생성
+5. Discord `/status`, `/blockers`, `/meeting-end` 명령 처리
+6. Slack 연동
+7. macOS Keychain 토큰 저장
+8. Cloud/Webhook 버전 설계
