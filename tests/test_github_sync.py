@@ -1,6 +1,6 @@
-from teampulse.config import Settings
-from teampulse.integrations.github import parse_repository, sync_github_integration
-from teampulse.models import Integration, Project, Provider, Workspace
+from openbrief.config import Settings
+from openbrief.integrations.github import parse_repository, sync_github_integration
+from openbrief.models import Integration, Project, Provider, Workspace
 
 
 class FakeGitHubClient:
@@ -15,17 +15,17 @@ class FakeGitHubClient:
     ) -> dict:
         assert access_token is None
         assert owner == "JH-9568"
-        assert repo == "TeamPulse"
+        assert repo == "OpenBrief"
         assert since is None
         assert limit == 50
         return {
             "issues": [
                 {
                     "number": 1,
-                    "title": "Setup TeamPulse",
+                    "title": "Setup OpenBrief",
                     "body": "Track project context",
                     "updated_at": "2026-07-18T10:00:00Z",
-                    "html_url": "https://github.com/JH-9568/TeamPulse/issues/1",
+                    "html_url": "https://github.com/JH-9568/OpenBrief/issues/1",
                     "state": "open",
                     "user": {"login": "jh"},
                 }
@@ -36,7 +36,7 @@ class FakeGitHubClient:
                     "title": "Add dashboard",
                     "body": "UI work",
                     "updated_at": "2026-07-18T11:00:00Z",
-                    "html_url": "https://github.com/JH-9568/TeamPulse/pull/2",
+                    "html_url": "https://github.com/JH-9568/OpenBrief/pull/2",
                     "state": "open",
                     "user": {"login": "jh"},
                 }
@@ -44,7 +44,7 @@ class FakeGitHubClient:
             "commits": [
                 {
                     "sha": "abcdef1234567890",
-                    "html_url": "https://github.com/JH-9568/TeamPulse/commit/abcdef",
+                    "html_url": "https://github.com/JH-9568/OpenBrief/commit/abcdef",
                     "commit": {
                         "message": "Initial commit",
                         "committer": {"date": "2026-07-18T12:00:00Z"},
@@ -59,7 +59,7 @@ class FakeGitHubClient:
                     "status": "completed",
                     "conclusion": "success",
                     "updated_at": "2026-07-18T13:00:00Z",
-                    "html_url": "https://github.com/JH-9568/TeamPulse/actions/runs/100",
+                    "html_url": "https://github.com/JH-9568/OpenBrief/actions/runs/100",
                     "head_branch": "main",
                     "event": "push",
                     "actor": {"login": "jh"},
@@ -78,9 +78,9 @@ async def test_sync_github_integration_fetches_repo_activity(session):
     integration = Integration(
         project_id=project.id,
         provider=Provider.GITHUB,
-        external_id="JH-9568/TeamPulse",
-        name="TeamPulse repo",
-        config={"repository": "JH-9568/TeamPulse"},
+        external_id="JH-9568/OpenBrief",
+        name="OpenBrief repo",
+        config={"repository": "JH-9568/OpenBrief"},
     )
     session.add(integration)
     await session.commit()
@@ -92,15 +92,15 @@ async def test_sync_github_integration_fetches_repo_activity(session):
         FakeGitHubClient(),
     )
 
-    assert result.repository == "JH-9568/TeamPulse"
+    assert result.repository == "JH-9568/OpenBrief"
     assert result.fetched == 4
     assert result.stored == 4
     assert result.duplicates == 0
 
 
 def test_parse_repository_accepts_url_and_owner_repo():
-    assert parse_repository("JH-9568/TeamPulse") == ("JH-9568", "TeamPulse")
-    assert parse_repository("https://github.com/JH-9568/TeamPulse.git") == (
+    assert parse_repository("JH-9568/OpenBrief") == ("JH-9568", "OpenBrief")
+    assert parse_repository("https://github.com/JH-9568/OpenBrief.git") == (
         "JH-9568",
-        "TeamPulse",
+        "OpenBrief",
     )

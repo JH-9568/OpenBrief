@@ -3,12 +3,12 @@ from datetime import UTC, datetime
 
 import httpx
 
-from teampulse.briefs.service import build_daily_revision
-from teampulse.db import get_session
-from teampulse.main import create_app
-from teampulse.models import BriefRevisionStatus, Project, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.briefs.service import build_daily_revision
+from openbrief.db import get_session
+from openbrief.main import create_app
+from openbrief.models import BriefRevisionStatus, Project, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 async def test_get_brief_revision_detail(session):

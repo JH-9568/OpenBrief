@@ -6,8 +6,8 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from teampulse import cli
-from teampulse.models import (
+from openbrief import cli
+from openbrief.models import (
     BriefRevision,
     Integration,
     Project,
@@ -24,8 +24,8 @@ def test_init_creates_local_config_and_sqlite_database(tmp_path, monkeypatch, ca
 
     assert exit_code == 0
     assert (tmp_path / "config.toml").exists()
-    assert (tmp_path / "teampulse.db").exists()
-    assert "TeamPulse local app initialized" in capsys.readouterr().out
+    assert (tmp_path / "openbrief.db").exists()
+    assert "OpenBrief local app initialized" in capsys.readouterr().out
 
 
 def test_status_reports_not_running_for_fresh_local_home(tmp_path, monkeypatch, capsys):
@@ -35,7 +35,7 @@ def test_status_reports_not_running_for_fresh_local_home(tmp_path, monkeypatch, 
 
     assert exit_code == 0
     output = capsys.readouterr().out
-    assert "TeamPulse is not running." in output
+    assert "OpenBrief is not running." in output
     assert str(Path(tmp_path) / "config.toml") in output
 
 
@@ -43,7 +43,7 @@ def test_default_config_uses_sqlite_database_in_local_home(tmp_path):
     config = cli.default_config(tmp_path)
 
     assert config.database_url.startswith("sqlite+aiosqlite:///")
-    assert config.database_url.endswith("/teampulse.db")
+    assert config.database_url.endswith("/openbrief.db")
     assert config.dashboard_url == "http://127.0.0.1:8000/dashboard"
 
 
@@ -62,7 +62,7 @@ def test_status_uses_runtime_dashboard_url(tmp_path, monkeypatch, capsys):
 
     assert exit_code == 0
     output = capsys.readouterr().out
-    assert "TeamPulse is running" in output
+    assert "OpenBrief is running" in output
     assert "http://127.0.0.1:8010/dashboard" in output
 
 
@@ -89,7 +89,7 @@ def test_setup_creates_project_and_integrations(tmp_path, monkeypatch):
             "--discord-bot-token",
             "discord-token",
             "--github-repo",
-            "JH-9568/TeamPulse",
+            "JH-9568/OpenBrief",
             "--github-token",
             "github-token",
         ]
@@ -116,7 +116,7 @@ def test_sync_reports_provider_errors_without_traceback(tmp_path, monkeypatch, c
             "--project-name",
             "Launch",
             "--github-repo",
-            "JH-9568/TeamPulse",
+            "JH-9568/OpenBrief",
         ]
     )
 

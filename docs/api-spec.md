@@ -1,8 +1,8 @@
-# TeamPulse API Spec
+# OpenBrief API Spec
 
 Base URL: `/api/v1`
 
-The MVP API is designed for a future dashboard and for provider ingestion. Authentication is not production-ready yet; approval endpoints temporarily use `X-TeamPulse-Member-ID`.
+The MVP API is designed for the local dashboard and provider ingestion. Authentication is not production-ready yet; confirmation endpoints temporarily use `X-OpenBrief-Member-ID`.
 
 ## Workspaces and Projects
 
@@ -12,7 +12,7 @@ The MVP API is designed for a future dashboard and for provider ingestion. Authe
 
 `GET /integration-setup/{provider}`
 
-Supported MVP providers: `discord`, `figma`, `notion`.
+Supported MVP providers: `discord`, `figma`, `notion`, `github`.
 
 Returns required permissions, config fields, provider docs, and for Discord an
 install URL when `DISCORD_APPLICATION_ID` is configured.
@@ -63,7 +63,7 @@ install URL when `DISCORD_APPLICATION_ID` is configured.
 
 `GET /projects/{project_id}/members`
 
-Active members are snapshotted when a brief revision is created.
+Active members are snapshotted when a brief revision is created. Local open-source mode creates a default owner automatically.
 
 ## Integrations
 
@@ -208,7 +208,7 @@ Expected provider behavior:
 
 - Figma sends JSON webhook events such as `PING`, `FILE_UPDATE`, and `FILE_COMMENT`.
 - The payload includes `passcode`.
-- TeamPulse compares it to `FIGMA_WEBHOOK_PASSCODE`.
+- OpenBrief compares it to `FIGMA_WEBHOOK_PASSCODE`.
 - `PING` verifies connectivity only and does not create a source item.
 
 Stored source kinds:
@@ -222,9 +222,9 @@ Stored source kinds:
 
 Expected provider behavior:
 
-- Initial verification requests contain `verification_token`; TeamPulse accepts them without creating source items.
+- Initial verification requests contain `verification_token`; OpenBrief accepts them without creating source items.
 - Event requests include `X-Notion-Signature`.
-- TeamPulse validates HMAC-SHA256 using `NOTION_WEBHOOK_VERIFICATION_TOKEN`.
+- OpenBrief validates HMAC-SHA256 using `NOTION_WEBHOOK_VERIFICATION_TOKEN`.
 
 Stored source kinds:
 
@@ -292,7 +292,7 @@ Editing creates a new revision and invalidates previous approvals by changing re
 
 Header:
 
-`X-TeamPulse-Member-ID: {project_member_id}`
+`X-OpenBrief-Member-ID: {project_member_id}`
 
 The revision becomes `confirmed` only when all snapshotted active members have approved the same revision hash.
 

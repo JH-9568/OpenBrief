@@ -1,23 +1,23 @@
 import asyncio
 from datetime import UTC, datetime
 
-from teampulse.briefs.service import build_daily_revision
-from teampulse.db import SessionFactory
-from teampulse.models import Project, ProjectMember, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.briefs.service import build_daily_revision
+from openbrief.db import SessionFactory
+from openbrief.models import Project, ProjectMember, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 async def main() -> None:
     async with SessionFactory() as session:
-        workspace = Workspace(name="TeamPulse Demo")
+        workspace = Workspace(name="OpenBrief Demo")
         session.add(workspace)
         await session.flush()
 
         project = Project(
             workspace_id=workspace.id,
             name="Demo Project",
-            description="Seeded demo project for local TeamPulse development.",
+            description="Seeded demo project for local OpenBrief development.",
             daily_report_channel_id="replace-with-discord-channel-id",
         )
         session.add(project)
@@ -75,7 +75,7 @@ async def main() -> None:
             source_items.append(source_item)
 
         revision = await build_daily_revision(session, project.id, source_items)
-        print("Seeded TeamPulse demo data")
+        print("Seeded OpenBrief demo data")
         print(f"Workspace ID: {workspace.id}")
         print(f"Project ID: {project.id}")
         print(f"Brief revision ID: {revision.id}")

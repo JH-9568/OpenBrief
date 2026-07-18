@@ -1,19 +1,19 @@
-# TeamPulse Architecture
+# OpenBrief Architecture
 
 ## Product Policy
 
-TeamPulse is a read-only synthesis layer over project tools. The MVP collects selected Figma, Notion, and Discord material, turns it into normalized source items, generates a daily project brief, and requires unanimous team approval before marking the brief confirmed.
+OpenBrief is a read-only local synthesis layer over project tools. The MVP collects selected Figma, Notion, Discord, and GitHub material, turns it into normalized source items, and generates grounded project briefs. Member approval exists as an advanced extension point, but the default open-source UX is a single local owner reviewing and confirming a brief.
 
-Source systems remain authoritative. TeamPulse does not modify Figma, Notion, Discord, GitHub, or Slack in the MVP.
+Source systems remain authoritative. OpenBrief does not modify Figma, Notion, Discord, GitHub, or Slack in the MVP.
 
 ## Main Decisions
 
 - Modular monolith: API, worker, and scheduler share one Python codebase.
-- Provider connectors are isolated under `teampulse.connectors`.
+- Provider connectors are isolated under `openbrief.connectors`.
 - All provider data becomes a common `SourceItem`.
-- Brief generation is separate from ingestion and approval.
+- Brief generation is separate from ingestion and confirmation.
 - AI claims must carry source references and a status: confirmed, AI inference, conflict, or needs confirmation.
-- Revision approval snapshots active members when a revision is created. Membership changes require creating a superseding revision.
+- Revision confirmation can snapshot active members for future team workflows. The local open-source mode creates a default owner automatically.
 - Editing a brief creates a new revision hash and supersedes the previous pending draft.
 - Credentials are encrypted before database storage; production key custody must use a KMS or secret manager.
 
@@ -21,9 +21,10 @@ Source systems remain authoritative. TeamPulse does not modify Figma, Notion, Di
 
 ```mermaid
 flowchart LR
-    Figma["Figma Webhooks"] --> API["FastAPI API"]
-    Notion["Notion Webhooks"] --> API
-    Discord["Discord Bot REST polling"] --> Worker["Celery Worker"]
+    Figma["Figma REST polling"] --> Worker["CLI / Worker"]
+    Notion["Notion REST polling"] --> Worker
+    GitHub["GitHub REST polling"] --> Worker
+    Discord["Discord Bot REST polling"] --> Worker
     API --> DB[(PostgreSQL)]
     Worker --> DB
     Worker --> Redis[(Redis)]
@@ -35,17 +36,16 @@ flowchart LR
 
 ## Ingestion Flow
 
-1. A provider webhook or polling job receives source activity.
+1. A provider polling job receives source activity. Cloud deployments may also use webhooks.
 2. Provider-specific connector verifies the request or credentials.
 3. Connector normalizes data into `SourceItem`.
 4. `SourceItem` is inserted idempotently by `(provider, external_id)`.
-5. Celery Beat runs the daily scheduler at `DAILY_BRIEF_HOUR:DAILY_BRIEF_MINUTE`.
-6. The scheduler polls active Discord integrations and reads source items in the daily window.
+5. `openbrief sync` or a scheduled worker polls configured integrations.
+6. `openbrief brief` or `openbrief sync --brief` reads source items for the project.
 7. The brief builder creates a new `BriefRevision` with source citations.
-8. The active member list is snapshotted into `approver_snapshot`.
-9. TeamPulse sends one Discord reminder for the pending revision.
-10. Members approve the exact revision hash.
-11. When all snapshotted members approve, the revision becomes confirmed.
+8. The local owner reviews the generated brief in the dashboard.
+9. Optional team approval can require all snapshotted members to approve the exact revision hash.
+10. Optional notification jobs can send Discord reminders.
 
 ## Connector Notes
 
@@ -79,12 +79,12 @@ The current code ships with `StructuredBriefBuilder`, a deterministic fallback t
 - no claim without source IDs unless explicitly unsupported;
 - all inferred claims labeled `ai_inference`;
 - conflicts surfaced, not silently resolved;
-- generated output stored as a draft until unanimous approval.
+- generated output stored as a reviewable revision until confirmation.
 
 ## Security and Privacy
 
-- Source collection is opt-in per project.
+- Source collection is opt-in per local project.
 - External credentials are encrypted at rest via Fernet for local MVP.
 - Production must move encryption key custody out of app environment variables.
 - Discord collection needs channel/member consent and retention policy before pilot use.
-- The MVP uses a temporary member-id header for approvals; production needs real auth.
+- The MVP uses a temporary member-id header for confirmation; cloud/team deployments need real auth.

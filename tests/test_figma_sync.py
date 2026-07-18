@@ -1,6 +1,6 @@
-from teampulse.config import Settings
-from teampulse.integrations.figma import sync_figma_integration
-from teampulse.models import Integration, Project, Provider, Workspace
+from openbrief.config import Settings
+from openbrief.integrations.figma import sync_figma_integration
+from openbrief.models import Integration, Project, Provider, Workspace
 
 
 class FakeFigmaClient:

@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
-from teampulse.config import Settings
-from teampulse.connectors.base import NormalizedSourceItem
-from teampulse.integrations.discord import poll_discord_integration
-from teampulse.models import Integration, Project, Provider, SourceItemKind, Workspace
+from openbrief.config import Settings
+from openbrief.connectors.base import NormalizedSourceItem
+from openbrief.integrations.discord import poll_discord_integration
+from openbrief.models import Integration, Project, Provider, SourceItemKind, Workspace
 
 
 class FakeDiscordClient:

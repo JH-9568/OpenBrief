@@ -3,12 +3,12 @@ from datetime import UTC, datetime
 
 import httpx
 
-from teampulse.briefs.service import build_daily_revision
-from teampulse.db import get_session
-from teampulse.main import create_app
-from teampulse.models import Project, ProjectMember, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.briefs.service import build_daily_revision
+from openbrief.db import get_session
+from openbrief.main import create_app
+from openbrief.models import Project, ProjectMember, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 async def test_project_dashboard_renders_latest_brief_and_sources(session):
@@ -71,6 +71,6 @@ async def test_dashboard_home_lists_projects(session):
         response = await client.get("/dashboard")
 
     assert response.status_code == 200
-    assert "TeamPulse" in response.text
+    assert "OpenBrief" in response.text
     assert "Launch" in response.text
     assert f"/dashboard/projects/{project.id}" in response.text

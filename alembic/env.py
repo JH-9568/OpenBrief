@@ -5,8 +5,8 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from teampulse.config import get_settings
-from teampulse.models import Base
+from openbrief.config import get_settings
+from openbrief.models import Base
 
 config = context.config
 

@@ -3,11 +3,11 @@ from datetime import UTC, datetime
 
 import httpx
 
-from teampulse.db import get_session
-from teampulse.main import create_app
-from teampulse.models import Project, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.db import get_session
+from openbrief.main import create_app
+from openbrief.models import Project, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 async def test_list_project_source_items_filters_by_provider_and_kind(session):

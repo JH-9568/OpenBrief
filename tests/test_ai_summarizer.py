@@ -2,11 +2,11 @@ from datetime import UTC, datetime
 
 import httpx
 
-from teampulse.briefs.ai_summarizer import OpenAICompatibleBriefBuilder
-from teampulse.config import Settings
-from teampulse.models import Project, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.briefs.ai_summarizer import OpenAICompatibleBriefBuilder
+from openbrief.config import Settings
+from openbrief.models import Project, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 async def test_openai_compatible_brief_builder_parses_json_content(session):

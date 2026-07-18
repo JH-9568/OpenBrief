@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from teampulse.briefs.service import approval_state, approve_revision, build_daily_revision
-from teampulse.models import (
+from openbrief.briefs.service import approval_state, approve_revision, build_daily_revision
+from openbrief.models import (
     BriefRevisionStatus,
     Project,
     ProjectMember,
@@ -9,8 +9,8 @@ from teampulse.models import (
     SourceItemKind,
     Workspace,
 )
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 async def test_revision_requires_all_snapshotted_members(session):

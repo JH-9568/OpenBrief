@@ -1,4 +1,4 @@
-# TeamPulse ERD
+# OpenBrief ERD
 
 ```mermaid
 erDiagram

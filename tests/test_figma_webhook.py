@@ -1,9 +1,9 @@
 import json
 
-from teampulse.connectors.figma import FigmaWebhookConnector
-from teampulse.models import Project, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.connectors.figma import FigmaWebhookConnector
+from openbrief.models import Project, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 def test_figma_webhook_verifies_passcode_and_ignores_ping():

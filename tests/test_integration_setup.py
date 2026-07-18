@@ -1,7 +1,7 @@
 import httpx
 
-from teampulse.config import Settings, get_settings
-from teampulse.main import create_app
+from openbrief.config import Settings, get_settings
+from openbrief.main import create_app
 
 
 async def test_discord_setup_returns_install_url_when_application_id_is_configured():

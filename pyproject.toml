@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "teampulse"
+name = "openbrief"
 version = "0.1.0"
-description = "Team activity automation service"
+description = "Open-source local project brief generator"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-teampulse = "teampulse.cli:main"
+openbrief = "openbrief.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -32,7 +32,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/teampulse"]
+packages = ["src/openbrief"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
-from teampulse.briefs.service import build_daily_revision
-from teampulse.models import Project, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.briefs.service import build_daily_revision
+from openbrief.models import Project, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 async def test_structured_brief_builder_routes_key_signals_to_sections(session):

@@ -1,4 +1,4 @@
-"""initial TeamPulse schema
+"""initial OpenBrief schema
 
 Revision ID: 0001_initial
 Revises:

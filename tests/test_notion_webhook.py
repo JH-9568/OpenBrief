@@ -2,10 +2,10 @@ import hmac
 import json
 from hashlib import sha256
 
-from teampulse.connectors.notion import NotionWebhookConnector
-from teampulse.models import Project, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.connectors.notion import NotionWebhookConnector
+from openbrief.models import Project, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 def test_notion_webhook_verifies_signature_and_ignores_verification_payload():

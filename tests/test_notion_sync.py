@@ -1,6 +1,6 @@
-from teampulse.config import Settings
-from teampulse.integrations.notion import sync_notion_integration
-from teampulse.models import Integration, Project, Provider, Workspace
+from openbrief.config import Settings
+from openbrief.integrations.notion import sync_notion_integration
+from openbrief.models import Integration, Project, Provider, Workspace
 
 
 class FakeNotionClient:

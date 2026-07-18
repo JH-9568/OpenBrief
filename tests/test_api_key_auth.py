@@ -1,7 +1,7 @@
 import httpx
 
-from teampulse.config import Settings, get_settings
-from teampulse.main import create_app
+from openbrief.config import Settings, get_settings
+from openbrief.main import create_app
 
 
 async def test_api_key_is_optional_when_not_configured():
@@ -23,7 +23,7 @@ async def test_api_key_blocks_protected_routes_when_configured():
         wrong = await client.post(
             "/api/v1/source-items/ingest",
             json={},
-            headers={"X-TeamPulse-API-Key": "wrong"},
+            headers={"X-OpenBrief-API-Key": "wrong"},
         )
 
     assert missing.status_code == 401

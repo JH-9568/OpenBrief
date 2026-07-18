@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 
-from teampulse.briefs.service import build_daily_revision
-from teampulse.config import Settings
-from teampulse.models import (
+from openbrief.briefs.service import build_daily_revision
+from openbrief.config import Settings
+from openbrief.models import (
     Integration,
     Project,
     ProjectMember,
@@ -10,9 +10,9 @@ from teampulse.models import (
     SourceItemKind,
     Workspace,
 )
-from teampulse.notifications.discord import send_discord_brief_notification
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.notifications.discord import send_discord_brief_notification
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 class FakeDiscordSender:

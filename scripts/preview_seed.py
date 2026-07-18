@@ -3,12 +3,12 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from teampulse.briefs.service import build_daily_revision
-from teampulse.config import get_settings
-from teampulse.db import SessionFactory
-from teampulse.models import Base, Project, ProjectMember, Provider, SourceItemKind, Workspace
-from teampulse.schemas import SourceItemCreate
-from teampulse.sources.service import store_source_item
+from openbrief.briefs.service import build_daily_revision
+from openbrief.config import get_settings
+from openbrief.db import SessionFactory
+from openbrief.models import Base, Project, ProjectMember, Provider, SourceItemKind, Workspace
+from openbrief.schemas import SourceItemCreate
+from openbrief.sources.service import store_source_item
 
 
 async def reset_database() -> None:
@@ -24,7 +24,7 @@ async def seed() -> None:
     await reset_database()
 
     async with SessionFactory() as session:
-        workspace = Workspace(name="TeamPulse Preview")
+        workspace = Workspace(name="OpenBrief Preview")
         session.add(workspace)
         await session.flush()
 
@@ -33,7 +33,7 @@ async def seed() -> None:
             name="Brand Renewal Sprint",
             description=(
                 "Figma, Notion, Discord에 흩어진 디자인 시안, 회의 결정, 할 일을 "
-                "TeamPulse가 읽기 전용으로 모아 정리하는 데모 프로젝트입니다."
+                "OpenBrief가 읽기 전용으로 모아 정리하는 데모 프로젝트입니다."
             ),
             daily_report_channel_id="discord-preview-channel",
         )
@@ -86,7 +86,7 @@ async def seed() -> None:
                 title="Discord meeting decision",
                 body=(
                     "회의 결정: 이번 주에는 원본 툴에 자동 반영하지 않고, "
-                    "TeamPulse에서 정리본을 다 같이 승인한 뒤 각 담당자가 반영합니다. "
+                    "OpenBrief에서 정리본을 다 같이 승인한 뒤 각 담당자가 반영합니다. "
                     "담당자: Planner는 기획 문서 정리, Designer는 CTA 시안 확정."
                 ),
                 occurred_at=now - timedelta(hours=3),
