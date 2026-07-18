@@ -9,6 +9,7 @@ from teampulse.config import Settings, get_settings
 from teampulse.db import get_session
 from teampulse.integrations.discord import poll_discord_integration
 from teampulse.integrations.figma import sync_figma_integration
+from teampulse.integrations.github import sync_github_integration
 from teampulse.integrations.notion import sync_notion_integration
 from teampulse.models import Integration, Project, ProjectMember, Provider, Workspace
 from teampulse.schemas import (
@@ -177,6 +178,17 @@ async def poll_integration(
                 integration_id=result.integration_id,
                 provider=Provider.NOTION,
                 page_ids=result.page_ids,
+                fetched=result.fetched,
+                stored=result.stored,
+                duplicates=result.duplicates,
+                checkpoint=result.last_synced_at,
+            )
+        if integration.provider == Provider.GITHUB:
+            result = await sync_github_integration(session, integration_id, settings)
+            return IntegrationPollRead(
+                integration_id=result.integration_id,
+                provider=Provider.GITHUB,
+                repository=result.repository,
                 fetched=result.fetched,
                 stored=result.stored,
                 duplicates=result.duplicates,

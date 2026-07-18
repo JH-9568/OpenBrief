@@ -9,14 +9,24 @@ import subprocess
 import sys
 import time
 import tomllib
+import uuid
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Timer
+from typing import Any
 
-from sqlalchemy.ext.asyncio import create_async_engine
+from cryptography.fernet import Fernet
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from teampulse.models import Base
+from teampulse.config import Settings
+from teampulse.integrations.discord import poll_discord_integration
+from teampulse.integrations.figma import sync_figma_integration
+from teampulse.integrations.github import sync_github_integration
+from teampulse.integrations.notion import sync_notion_integration
+from teampulse.models import Base, Integration, Project, ProjectMember, Provider, Workspace
+from teampulse.security import CredentialCipher
 
 HOME_ENV = "TEAMPULSE_HOME"
 DEFAULT_HOST = "127.0.0.1"
@@ -34,6 +44,7 @@ class LocalConfig:
     log_path: Path
     pid_path: Path
     run_path: Path
+    token_encryption_key: str
 
     @property
     def dashboard_url(self) -> str:
@@ -65,6 +76,31 @@ def build_parser() -> argparse.ArgumentParser:
     start_parser.add_argument("--no-browser", action="store_true", help="Do not open a browser")
     start_parser.add_argument("--home", type=Path, help="Override TeamPulse local app directory")
     start_parser.set_defaults(func=start_command)
+
+    setup_parser = subparsers.add_parser("setup", help="Create a project and connect sources")
+    setup_parser.add_argument("--home", type=Path, help="Override TeamPulse local app directory")
+    setup_parser.add_argument("--project-name", default="TeamPulse Project")
+    setup_parser.add_argument("--description", default="")
+    setup_parser.add_argument("--member", action="append", default=[], help="Member as Name:email")
+    setup_parser.add_argument("--figma-file-url", default=None)
+    setup_parser.add_argument("--figma-token", default=None)
+    setup_parser.add_argument("--notion-page-url", action="append", default=[])
+    setup_parser.add_argument("--notion-token", default=None)
+    setup_parser.add_argument("--discord-channel-id", default=None)
+    setup_parser.add_argument("--discord-bot-token", default=None)
+    setup_parser.add_argument("--github-repo", default=None)
+    setup_parser.add_argument("--github-token", default=None)
+    setup_parser.set_defaults(func=setup_command)
+
+    sync_parser = subparsers.add_parser("sync", help="Poll connected sources into TeamPulse")
+    sync_parser.add_argument("--home", type=Path, help="Override TeamPulse local app directory")
+    sync_parser.add_argument(
+        "--provider",
+        choices=[provider.value for provider in Provider],
+        help="Only sync one provider",
+    )
+    sync_parser.add_argument("--project-id", default=None, help="Only sync one project UUID")
+    sync_parser.set_defaults(func=sync_command)
 
     stop_parser = subparsers.add_parser("stop", help="Stop a background TeamPulse process")
     stop_parser.add_argument("--home", type=Path, help="Override TeamPulse local app directory")
@@ -103,8 +139,9 @@ def start_command(args: argparse.Namespace) -> int:
 
     if is_running(config.pid_path):
         pid = config.pid_path.read_text(encoding="utf-8").strip()
+        runtime_url = runtime_dashboard_url(config) or config.dashboard_url
         print(f"TeamPulse is already running with PID {pid}")
-        print(f"Dashboard: {config.dashboard_url}")
+        print(f"Dashboard: {runtime_url}")
         return 0
 
     if args.daemon:
@@ -149,6 +186,34 @@ def status_command(args: argparse.Namespace) -> int:
 
     print("TeamPulse is not running.")
     print(f"Config: {config.config_path}")
+    return 0
+
+
+def setup_command(args: argparse.Namespace) -> int:
+    config = ensure_initialized(home_arg=args.home, force=False)
+    result = asyncio.run(configure_local_project(config, args))
+    print(f"Configured project: {result['project_name']} ({result['project_id']})")
+    for line in result["integrations"]:
+        print(f"- {line}")
+    print(f"Dashboard: {config.dashboard_url}/projects/{result['project_id']}")
+    return 0
+
+
+def sync_command(args: argparse.Namespace) -> int:
+    config = ensure_initialized(home_arg=args.home, force=False)
+    results = asyncio.run(sync_local_integrations(config, args.provider, args.project_id))
+    if not results:
+        print("No matching integrations to sync. Run `teampulse setup` first.")
+        return 0
+    for result in results:
+        if result.get("error"):
+            print(f"{result['provider']} {result['name']}: error={result['error']}")
+        else:
+            print(
+                f"{result['provider']} {result['name']}: "
+                f"fetched={result['fetched']} stored={result['stored']} "
+                f"duplicates={result['duplicates']} checkpoint={result['checkpoint']}"
+            )
     return 0
 
 
@@ -225,7 +290,7 @@ def ensure_initialized(home_arg: Path | None, force: bool) -> LocalConfig:
     config.home.mkdir(parents=True, exist_ok=True)
     config.log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if force or not config.config_path.exists():
+    if force or not config.config_path.exists() or config_needs_migration(config.config_path):
         write_config(config)
     asyncio.run(create_database(config.database_url))
     return config
@@ -236,6 +301,216 @@ async def create_database(database_url: str) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
+
+
+async def configure_local_project(config: LocalConfig, args: argparse.Namespace) -> dict:
+    factory, engine = session_factory(config)
+    integrations: list[str] = []
+    try:
+        async with factory() as session:
+            workspace = await first_workspace(session)
+            if workspace is None:
+                workspace = Workspace(name="TeamPulse Local")
+                session.add(workspace)
+                await session.flush()
+
+            project = Project(
+                workspace_id=workspace.id,
+                name=args.project_name,
+                description=args.description or "Local TeamPulse project",
+            )
+            session.add(project)
+            await session.flush()
+
+            members = parse_members(args.member)
+            if not members:
+                members = [("Owner", "owner@teampulse.local")]
+            for display_name, email in members:
+                session.add(
+                    ProjectMember(
+                        project_id=project.id,
+                        display_name=display_name,
+                        email=email,
+                    )
+                )
+
+            if args.figma_file_url:
+                file_key = parse_figma_file_key(args.figma_file_url)
+                await add_local_integration(
+                    session,
+                    config,
+                    project,
+                    Provider.FIGMA,
+                    external_id=file_key,
+                    name=f"Figma {file_key}",
+                    credentials={"access_token": args.figma_token} if args.figma_token else None,
+                    config_data={"file_key": file_key},
+                )
+                integrations.append(f"figma file={file_key}")
+
+            if args.notion_page_url:
+                page_ids = [parse_notion_page_id(value) for value in args.notion_page_url]
+                await add_local_integration(
+                    session,
+                    config,
+                    project,
+                    Provider.NOTION,
+                    external_id=page_ids[0],
+                    name="Notion pages",
+                    credentials={"access_token": args.notion_token} if args.notion_token else None,
+                    config_data={"page_ids": page_ids},
+                )
+                integrations.append(f"notion pages={','.join(page_ids)}")
+
+            if args.discord_channel_id:
+                await add_local_integration(
+                    session,
+                    config,
+                    project,
+                    Provider.DISCORD,
+                    external_id=args.discord_channel_id,
+                    name=f"Discord {args.discord_channel_id}",
+                    credentials={"bot_token": args.discord_bot_token}
+                    if args.discord_bot_token
+                    else None,
+                    config_data={"channel_id": args.discord_channel_id},
+                )
+                integrations.append(f"discord channel={args.discord_channel_id}")
+
+            if args.github_repo:
+                repository = parse_github_repo(args.github_repo)
+                await add_local_integration(
+                    session,
+                    config,
+                    project,
+                    Provider.GITHUB,
+                    external_id=repository,
+                    name=f"GitHub {repository}",
+                    credentials={"access_token": args.github_token} if args.github_token else None,
+                    config_data={"repository": repository},
+                )
+                integrations.append(f"github repo={repository}")
+
+            await session.commit()
+            return {
+                "project_id": str(project.id),
+                "project_name": project.name,
+                "integrations": integrations or ["no sources connected yet"],
+            }
+    finally:
+        await engine.dispose()
+
+
+async def add_local_integration(
+    session: AsyncSession,
+    config: LocalConfig,
+    project: Project,
+    provider: Provider,
+    *,
+    external_id: str,
+    name: str,
+    credentials: dict | None,
+    config_data: dict,
+) -> None:
+    encrypted_credentials = None
+    if credentials:
+        cipher = CredentialCipher(config.token_encryption_key)
+        encrypted_credentials = cipher.encrypt(json.dumps(credentials))
+    session.add(
+        Integration(
+            project_id=project.id,
+            provider=provider,
+            external_id=external_id,
+            name=name,
+            encrypted_credentials=encrypted_credentials,
+            config=config_data,
+        )
+    )
+
+
+async def sync_local_integrations(
+    config: LocalConfig,
+    provider_filter: str | None,
+    project_id_filter: str | None,
+) -> list[dict]:
+    factory, engine = session_factory(config)
+    settings = Settings(token_encryption_key=config.token_encryption_key)
+    try:
+        async with factory() as session:
+            query = select(Integration).order_by(Integration.created_at.asc())
+            if provider_filter:
+                query = query.where(Integration.provider == Provider(provider_filter))
+            if project_id_filter:
+                query = query.where(Integration.project_id == uuid.UUID(project_id_filter))
+            rows = await session.execute(query)
+            integrations = list(rows.scalars().all())
+
+            results: list[dict] = []
+            for integration in integrations:
+                try:
+                    result = await sync_one_integration(session, integration, settings)
+                except Exception as exc:  # noqa: BLE001
+                    result = {"error": str(exc)}
+                results.append(
+                    {
+                        "provider": integration.provider.value,
+                        "name": integration.name,
+                        **result,
+                    }
+                )
+            return results
+    finally:
+        await engine.dispose()
+
+
+async def sync_one_integration(
+    session: AsyncSession,
+    integration: Integration,
+    settings: Settings,
+) -> dict:
+    if integration.provider == Provider.FIGMA:
+        result = await sync_figma_integration(session, integration.id, settings)
+        return {
+            "fetched": result.fetched,
+            "stored": result.stored,
+            "duplicates": result.duplicates,
+            "checkpoint": result.last_synced_at,
+        }
+    if integration.provider == Provider.NOTION:
+        result = await sync_notion_integration(session, integration.id, settings)
+        return {
+            "fetched": result.fetched,
+            "stored": result.stored,
+            "duplicates": result.duplicates,
+            "checkpoint": result.last_synced_at,
+        }
+    if integration.provider == Provider.DISCORD:
+        result = await poll_discord_integration(session, integration.id, settings)
+        return {
+            "fetched": result.fetched,
+            "stored": result.stored,
+            "duplicates": result.duplicates,
+            "checkpoint": result.last_message_id,
+        }
+    if integration.provider == Provider.GITHUB:
+        result = await sync_github_integration(session, integration.id, settings)
+        return {
+            "fetched": result.fetched,
+            "stored": result.stored,
+            "duplicates": result.duplicates,
+            "checkpoint": result.last_synced_at,
+        }
+    raise ValueError(f"{integration.provider.value} sync is not implemented")
+
+
+def session_factory(config: LocalConfig) -> tuple[async_sessionmaker[AsyncSession], Any]:
+    engine = create_async_engine(config.database_url)
+    return async_sessionmaker(engine, expire_on_commit=False), engine
+
+
+async def first_workspace(session: AsyncSession) -> Workspace | None:
+    result = await session.execute(select(Workspace).order_by(Workspace.created_at.asc()).limit(1))
+    return result.scalar_one_or_none()
 
 
 def load_or_default_config(home_arg: Path | None) -> LocalConfig:
@@ -249,6 +524,7 @@ def load_or_default_config(home_arg: Path | None) -> LocalConfig:
     server = data.get("server", {})
     database = data.get("database", {})
     app = data.get("app", {})
+    secrets = data.get("secrets", {})
     return LocalConfig(
         home=home,
         config_path=config_path,
@@ -259,6 +535,9 @@ def load_or_default_config(home_arg: Path | None) -> LocalConfig:
         log_path=Path(app.get("log_path", default.log_path)).expanduser(),
         pid_path=Path(app.get("pid_path", default.pid_path)).expanduser(),
         run_path=Path(app.get("run_path", default.run_path)).expanduser(),
+        token_encryption_key=str(
+            secrets.get("token_encryption_key", default.token_encryption_key)
+        ),
     )
 
 
@@ -274,6 +553,7 @@ def default_config(home: Path) -> LocalConfig:
         log_path=home / "logs" / "teampulse.log",
         pid_path=home / "teampulse.pid",
         run_path=home / "run.json",
+        token_encryption_key=Fernet.generate_key().decode(),
     )
 
 
@@ -294,6 +574,7 @@ def with_overrides(
         log_path=config.log_path,
         pid_path=config.pid_path,
         run_path=config.run_path,
+        token_encryption_key=config.token_encryption_key,
     )
 
 
@@ -313,14 +594,25 @@ open_browser = {str(config.open_browser).lower()}
 log_path = "{config.log_path}"
 pid_path = "{config.pid_path}"
 run_path = "{config.run_path}"
+
+[secrets]
+token_encryption_key = "{config.token_encryption_key}"
 """,
         encoding="utf-8",
     )
 
 
+def config_needs_migration(path: Path) -> bool:
+    if not path.exists():
+        return False
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    return "token_encryption_key" not in data.get("secrets", {})
+
+
 def apply_runtime_env(config: LocalConfig) -> None:
     os.environ.setdefault("DATABASE_URL", config.database_url)
     os.environ.setdefault("ENVIRONMENT", "local")
+    os.environ.setdefault("TOKEN_ENCRYPTION_KEY", config.token_encryption_key)
 
 
 def local_home(home_arg: Path | None = None) -> Path:
@@ -333,6 +625,41 @@ def local_home(home_arg: Path | None = None) -> Path:
 
 def sqlite_url(path: Path) -> str:
     return f"sqlite+aiosqlite:///{path.expanduser().resolve()}"
+
+
+def parse_members(values: list[str]) -> list[tuple[str, str]]:
+    members: list[tuple[str, str]] = []
+    for value in values:
+        if ":" not in value:
+            raise ValueError("--member must use Name:email")
+        name, email = value.split(":", 1)
+        members.append((name.strip(), email.strip()))
+    return members
+
+
+def parse_figma_file_key(value: str) -> str:
+    marker = "/file/"
+    if marker in value:
+        return value.split(marker, 1)[1].split("/", 1)[0].split("?", 1)[0]
+    marker = "/design/"
+    if marker in value:
+        return value.split(marker, 1)[1].split("/", 1)[0].split("?", 1)[0]
+    return value.strip()
+
+
+def parse_notion_page_id(value: str) -> str:
+    normalized = value.strip().split("?", 1)[0].rstrip("/")
+    tail = normalized.rsplit("/", 1)[-1]
+    candidate = tail.rsplit("-", 1)[-1]
+    return candidate.replace("-", "")
+
+
+def parse_github_repo(value: str) -> str:
+    normalized = value.strip().removeprefix("https://github.com/").removesuffix(".git")
+    parts = [part for part in normalized.split("/") if part]
+    if len(parts) < 2:
+        raise ValueError("--github-repo must be owner/repo or a GitHub repository URL")
+    return f"{parts[0]}/{parts[1]}"
 
 
 def write_runtime(config: LocalConfig) -> None:

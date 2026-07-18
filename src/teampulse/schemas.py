@@ -90,6 +90,7 @@ class IntegrationPollRead(BaseModel):
     channel_id: str | None = None
     file_key: str | None = None
     page_ids: list[str] | None = None
+    repository: str | None = None
     fetched: int
     stored: int
     duplicates: int

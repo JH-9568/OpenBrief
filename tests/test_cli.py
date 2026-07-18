@@ -1,8 +1,13 @@
+import asyncio
 import json
 import os
 from pathlib import Path
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
 from teampulse import cli
+from teampulse.models import Integration, Project, Provider
 
 
 def test_init_creates_local_config_and_sqlite_database(tmp_path, monkeypatch, capsys):
@@ -52,3 +57,81 @@ def test_status_uses_runtime_dashboard_url(tmp_path, monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "TeamPulse is running" in output
     assert "http://127.0.0.1:8010/dashboard" in output
+
+
+def test_setup_creates_project_and_integrations(tmp_path, monkeypatch):
+    monkeypatch.setenv(cli.HOME_ENV, str(tmp_path))
+
+    exit_code = cli.main(
+        [
+            "setup",
+            "--project-name",
+            "Launch",
+            "--member",
+            "JH:jh@example.com",
+            "--figma-file-url",
+            "https://www.figma.com/file/file-123/Mock",
+            "--figma-token",
+            "figma-token",
+            "--notion-page-url",
+            "https://www.notion.so/Sprint-abcdef1234567890abcdef1234567890",
+            "--notion-token",
+            "notion-token",
+            "--discord-channel-id",
+            "channel-1",
+            "--discord-bot-token",
+            "discord-token",
+            "--github-repo",
+            "JH-9568/TeamPulse",
+            "--github-token",
+            "github-token",
+        ]
+    )
+
+    assert exit_code == 0
+    projects, integrations = asyncio.run(load_projects_and_integrations(tmp_path))
+
+    assert [project.name for project in projects] == ["Launch"]
+    assert {integration.provider for integration in integrations} == {
+        Provider.FIGMA,
+        Provider.NOTION,
+        Provider.DISCORD,
+        Provider.GITHUB,
+    }
+    assert all(integration.encrypted_credentials for integration in integrations)
+
+
+def test_sync_reports_provider_errors_without_traceback(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv(cli.HOME_ENV, str(tmp_path))
+    cli.main(
+        [
+            "setup",
+            "--project-name",
+            "Launch",
+            "--github-repo",
+            "JH-9568/TeamPulse",
+        ]
+    )
+
+    async def failing_sync_one(session, integration, settings):
+        del session, integration, settings
+        raise RuntimeError("network unavailable")
+
+    monkeypatch.setattr(cli, "sync_one_integration", failing_sync_one)
+
+    exit_code = cli.main(["sync", "--provider", "github"])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "error=network unavailable" in output
+
+
+async def load_projects_and_integrations(tmp_path):
+    config = cli.load_or_default_config(tmp_path)
+    engine = create_async_engine(config.database_url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as session:
+        projects = list((await session.execute(select(Project))).scalars().all())
+        integrations = list((await session.execute(select(Integration))).scalars().all())
+    await engine.dispose()
+    return projects, integrations

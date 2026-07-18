@@ -52,6 +52,13 @@ teampulse init
 teampulse start
 ```
 
+For a user-style install directly from GitHub:
+
+```bash
+pipx install "git+https://github.com/JH-9568/TeamPulse.git"
+teampulse init
+```
+
 Then open:
 
 ```text
@@ -65,6 +72,36 @@ teampulse start --daemon
 teampulse status
 teampulse stop
 ```
+
+To connect real project sources:
+
+```bash
+teampulse setup \
+  --project-name "Brand Renewal Sprint" \
+  --member "JH:jh@example.com" \
+  --figma-file-url "https://www.figma.com/file/..." \
+  --figma-token "figd_..." \
+  --notion-page-url "https://www.notion.so/..." \
+  --notion-token "secret_..." \
+  --discord-channel-id "1234567890" \
+  --discord-bot-token "..." \
+  --github-repo "JH-9568/TeamPulse" \
+  --github-token "github_pat_..."
+```
+
+Then poll connected sources:
+
+```bash
+teampulse sync
+teampulse sync --provider figma
+teampulse sync --provider notion
+teampulse sync --provider discord
+teampulse sync --provider github
+```
+
+Provider tokens passed to `teampulse setup` are encrypted before they are stored
+in the local SQLite database. The local encryption key lives in
+`~/.teampulse/config.toml`, so protect this directory like other local app data.
 
 Local app files are stored under:
 

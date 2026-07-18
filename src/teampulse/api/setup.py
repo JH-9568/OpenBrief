@@ -26,6 +26,7 @@ async def get_integration_setup(
     builders: dict[Provider, Any] = {
         Provider.DISCORD: discord_setup,
         Provider.FIGMA: figma_setup,
+        Provider.GITHUB: github_setup,
         Provider.NOTION: notion_setup,
     }
     if provider not in builders:
@@ -80,4 +81,22 @@ def notion_setup(settings: Settings) -> IntegrationSetupRead:
             "Webhook signatures should be verified with X-Notion-Signature.",
         ],
         docs_url="https://developers.notion.com/reference/capabilities",
+    )
+
+
+def github_setup(settings: Settings) -> IntegrationSetupRead:
+    del settings
+    return IntegrationSetupRead(
+        provider=Provider.GITHUB,
+        required_permissions=[
+            "repo read access for private repositories",
+            "public_repo for public repositories",
+            "actions:read for CI workflow runs",
+        ],
+        required_config=["repository", "access_token"],
+        notes=[
+            "Use owner/repo or a GitHub repository URL.",
+            "Public repositories can be synced without a token, but rate limits are lower.",
+        ],
+        docs_url="https://docs.github.com/rest",
     )
