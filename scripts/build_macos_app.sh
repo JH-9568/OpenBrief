@@ -37,13 +37,35 @@ cat > "$APP_PATH/Contents/MacOS/OpenBrief" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v openbrief >/dev/null 2>&1; then
-  osascript -e 'display dialog "OpenBrief CLI is not installed. Run: pipx install \"git+https://github.com/JH-9568/OpenBrief.git\"" buttons {"OK"} default button "OK"'
+OPENBRIEF_BIN="${OPENBRIEF_BIN:-}"
+
+if [[ -z "$OPENBRIEF_BIN" ]] && command -v openbrief >/dev/null 2>&1; then
+  OPENBRIEF_BIN="$(command -v openbrief)"
+fi
+
+if [[ -z "$OPENBRIEF_BIN" && -x "$HOME/.local/bin/openbrief" ]]; then
+  OPENBRIEF_BIN="$HOME/.local/bin/openbrief"
+fi
+
+if [[ -z "$OPENBRIEF_BIN" && -x "/opt/homebrew/bin/openbrief" ]]; then
+  OPENBRIEF_BIN="/opt/homebrew/bin/openbrief"
+fi
+
+if [[ -z "$OPENBRIEF_BIN" ]]; then
+  osascript -e 'display dialog "OpenBrief CLI is not installed. Install it first with: pipx install \"git+https://github.com/JH-9568/OpenBrief.git\"" buttons {"OK"} default button "OK"'
   exit 127
 fi
 
-openbrief start --daemon
-open "http://127.0.0.1:8000/dashboard"
+"$OPENBRIEF_BIN" start --daemon --no-browser >/tmp/openbrief-launcher.log 2>&1 || true
+
+STATUS_OUTPUT="$("$OPENBRIEF_BIN" status 2>/tmp/openbrief-launcher-status.log || true)"
+DASHBOARD_URL="$(printf '%s\n' "$STATUS_OUTPUT" | awk '/Dashboard:/ {print $2; exit}')"
+
+if [[ -z "$DASHBOARD_URL" ]]; then
+  DASHBOARD_URL="http://127.0.0.1:8000/dashboard"
+fi
+
+open "$DASHBOARD_URL"
 LAUNCHER
 
 chmod +x "$APP_PATH/Contents/MacOS/OpenBrief"
